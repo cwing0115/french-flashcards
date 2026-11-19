@@ -581,6 +581,17 @@ button,input{font:inherit}button{cursor:pointer;border:1px solid var(--line);bor
 .entry .example .reveal{display:block;margin-top:6px}
 #dict-audio:not(:empty){position:sticky;bottom:10px;z-index:3;margin:10px 0;padding:10px 14px;border:1px solid var(--line);border-radius:8px;background:var(--paper);box-shadow:0 2px 10px #34394a22}
 @media(max-width:480px){.dict-controls{gap:4px}.search{flex-basis:100%}.entry-row{gap:7px;padding:8px;grid-template-columns:minmax(0,1.15fr) 44px minmax(0,1fr) 12px}.entry-row .meaning{font-size:15px}.home-actions{gap:6px}.home-actions button{padding-inline:12px}}
+.mark-word{position:relative;z-index:2;min-height:44px;white-space:nowrap;font-size:14px;padding-inline:9px}
+.mark-word[aria-pressed="true"]{background:#fff0c4;color:#654400;border-color:#b48c38}
+.group-counts{text-align:right}.group-counts small{display:block;font-size:12px;color:var(--muted)}
+.backup-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+#mark-status:not(:empty){margin-top:8px;color:var(--muted);font-size:14px}
+.entry-row{grid-template-columns:minmax(0,1.15fr) auto minmax(0,1fr) auto 14px}
+@media(max-width:520px){
+  .entry-row{grid-template-columns:minmax(0,1fr) 44px auto 12px;grid-template-areas:"term sound mark arrow" "meaning meaning meaning meaning";gap:4px 7px}
+  .entry-toggle{grid-area:term}.entry-row>.sound{grid-area:sound}.entry-row>.mark-word{grid-area:mark}
+  .entry-row>.meaning,.entry-row>.reveal{grid-area:meaning}.entry-row::after{grid-area:arrow}
+}
 [hidden]{display:none!important}
 @media(max-width:600px){main{padding-top:19px}header{padding:18px 0}.deck-art{width:57px;height:43px}.groups{grid-template-columns:1fr;gap:7px}.group{padding:11px 14px}.section-head{margin-top:16px}.subtle{padding-inline:7px}.settings{margin:12px 0}.nav{gap:6px}.nav button{padding-inline:6px}.flash{margin-top:14px}.toolbar{flex-wrap:wrap}}
 </style>
@@ -590,8 +601,11 @@ button,input{font:inherit}button{cursor:pointer;border:1px solid var(--line);bor
 <section id="home" aria-labelledby="group-title">
 <div class="section-head"><div><h2 class="section-title" id="group-title">選擇分類</h2><p class="muted summary" id="total"></p></div><div class="tools"><button class="subtle" id="all">全選</button><button class="subtle" id="none">全部取消</button></div></div>
 <div id="groups" class="groups"></div>
-<div class="settings"><label class="mode"><input id="reverse" class="switch" type="checkbox" role="switch"><span><strong>反向模式</strong><span class="hint">先睇中文或日文，翻卡睇法文</span></span></label></div>
+<div class="settings"><label class="mode"><input id="reverse" class="switch" type="checkbox" role="switch"><span><strong>反向模式</strong><span class="hint">先睇中文或日文，翻卡睇法文</span></span></label>
+<label class="mode"><input id="only-unfamiliar" class="switch" type="checkbox" role="switch"><span><strong>只溫唔熟的字</strong><span class="hint">由已揀分類中，練習標咗星嘅單詞</span></span></label></div>
 <div class="toolbar"><span id="selection" aria-live="polite" class="selection"></span><div class="home-actions"><button type="button" onclick="location.href='pronunciation.html'">發音</button><button id="open-dict">字典</button><button id="start" class="primary">開始練習 →</button></div></div>
+<div class="backup-actions"><button id="export-marks">匯出標記</button><button id="import-marks" title="將備份標記合併到目前標記">匯入標記</button><input id="mark-file" type="file" accept=".txt,.json,text/plain,application/json" hidden></div>
+<p id="mark-status" role="status"></p>
 <p class="voice-info" id="voice-name" role="status"></p>
 </section>
 <section id="dictionary" aria-labelledby="dict-title" hidden>
@@ -780,6 +794,106 @@ function searchKey(value) {
     .replace(/œ/g, "oe").replace(/æ/g, "ae").replace(/[’‘ʼ]/g, "'").trim();
 }
 const expandedWords = new Set();
+const markStorage = "french-flashcards.unfamiliar.v1";
+const markKey = word => JSON.stringify([word.group, word.fr]);
+const groupMarkCounts = new Map();
+const markedButtons = () => document.querySelectorAll("button.mark-word");
+let marks = new Set();
+
+function parseMarks(text) {
+  const data = JSON.parse(text.replace(/^\uFEFF/, ""));
+  if (data?.format !== markStorage || !Array.isArray(data.words) ||
+      !data.words.every(pair => Array.isArray(pair) && pair.length === 2 &&
+        pair.every(value => typeof value === "string" && value.trim().length > 0))) {
+    throw new Error("Invalid mark backup");
+  }
+  return new Set(data.words.map(pair => JSON.stringify(pair)));
+}
+function encodeMarks() {
+  return JSON.stringify({format:markStorage, words:[...marks].sort().map(key => JSON.parse(key))}, null, 2);
+}
+let unsavedMarks = false;
+function readMarks() {
+  if (unsavedMarks) return;
+  try {
+    const saved = localStorage.getItem(markStorage);
+    marks = saved === null ? new Set() : parseMarks(saved);
+  } catch {
+    byId("mark-status").textContent = "暫時讀唔到已儲存嘅標記。";
+  }
+}
+function paintMark(button) {
+  const active = marks.has(button.dataset.markKey);
+  button.textContent = active ? "✓ 已標記" : "⭐ 唔熟";
+  button.setAttribute("aria-pressed", String(active));
+  button.title = active ? "取消唔熟標記" : "標記為唔熟";
+}
+function refreshMarks() {
+  markedButtons().forEach(paintMark);
+  syncSelection();
+}
+function saveMarks(message = "") {
+  try {
+    localStorage.setItem(markStorage, encodeMarks());
+    unsavedMarks = false;
+  } catch {
+    unsavedMarks = true;
+    message = "瀏覽器未能儲存標記，請返主畫面撳「匯出標記」備份。";
+  }
+  byId("mark-status").textContent = message;
+  if (unsavedMarks && !byId("study").hidden) byId("audio-status").textContent = message;
+  if (unsavedMarks && !byId("dictionary").hidden) byId("dict-audio").textContent = message;
+  refreshMarks();
+}
+function markButton(word) {
+  const key = markKey(word);
+  const button = element("button", "mark-word");
+  button.type = "button";
+  button.dataset.markKey = key;
+  button.setAttribute("aria-label", word.fr + " 嘅唔熟標記");
+  paintMark(button);
+  button.onclick = () => {
+    readMarks();
+    if (marks.has(key)) marks.delete(key); else marks.add(key);
+    saveMarks();
+  };
+  return button;
+}
+readMarks();
+window.addEventListener("storage", event => {
+  if (event.key !== markStorage && event.key !== null) return;
+  readMarks();
+  refreshMarks();
+});
+byId("export-marks").onclick = () => {
+  readMarks();
+  const url = URL.createObjectURL(new Blob([encodeMarks() + "\n"], {type:"text/plain;charset=utf-8"}));
+  const link = element("a");
+  link.href = url;
+  link.download = "法文單詞卡_唔熟標記.txt";
+  document.body.append(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  byId("mark-status").textContent = "已匯出 " + marks.size + " 個標記。";
+};
+byId("import-marks").onclick = () => byId("mark-file").click();
+byId("mark-file").onchange = async event => {
+  const input = event.currentTarget;
+  const file = input.files[0];
+  if (!file) return;
+  try {
+    const imported = parseMarks(await file.text());
+    readMarks();
+    const previous = marks.size;
+    imported.forEach(key => marks.add(key));
+    saveMarks("已合併備份，新增 " + (marks.size - previous) + " 個標記。");
+  } catch {
+    byId("mark-status").textContent = "匯入失敗。請選擇用「匯出標記」下載嘅文字檔。";
+  } finally {
+    input.value = "";
+  }
+};
 function dictionaryEntry(word, mask) {
   const entry = element("div", "entry");
   const row = element("div", "entry-row");
@@ -788,7 +902,7 @@ function dictionaryEntry(word, mask) {
   toggle.append(frenchTerm(parts));
   toggle.setAttribute("aria-expanded", "false");
   const line = translation(word);
-  row.append(toggle, wordAudio(parts), mask ? maskTranslation(line, "詞義") : line);
+  row.append(toggle, wordAudio(parts), mask ? maskTranslation(line, "詞義") : line, markButton(word));
   entry.append(row);
   let detail;
   function setExpanded(open) {
@@ -846,6 +960,7 @@ function showCard() {
   const showFrench = byId("reverse").checked === flipped;
   if (showFrench) french(word); else byId("content").append(translation(word));
   if (flipped && (word.ex_fr || word.ex_zh)) byId("content").append(example(word));
+  if (flipped) byId("content").append(markButton(word));
   byId("category").textContent = word.group;
   byId("side").textContent = flipped ? "背面" : "正面";
   byId("flip-hint").textContent = flipped ? "點一下翻返正面" : "點一下揭曉答案";
@@ -872,11 +987,22 @@ function navigate(step) {
   showCard();
 }
 function syncSelection() {
-  let count = 0;
-  for (const [group, box] of boxes) if (box.checked) count += groups.get(group).length;
-  byId("selection").textContent = "已揀 " + count + " 張";
+  let selected = 0;
+  let unfamiliar = 0;
+  for (const [group, box] of boxes) {
+    const words = groups.get(group);
+    const marked = words.filter(word => marks.has(markKey(word))).length;
+    groupMarkCounts.get(group).textContent = "唔熟：" + marked + " 張";
+    if (box.checked) {
+      selected += words.length;
+      unfamiliar += marked;
+    }
+  }
+  const onlyMarked = byId("only-unfamiliar").checked;
+  const count = onlyMarked ? unfamiliar : selected;
+  byId("selection").textContent = onlyMarked ? "已揀分類有 " + count + " 張唔熟卡" : "已揀 " + count + " 張";
   byId("start").disabled = !count;
-  byId("open-dict").disabled = !count;
+  byId("open-dict").disabled = !selected;
 }
 for (const [name, words] of groups) {
   const label = element("label", "group");
@@ -891,19 +1017,25 @@ for (const [name, words] of groups) {
   const preview = element("span", "preview", words.slice(0,2).map(w => forms(w)[0].text).join(" · "));
   preview.lang = "fr";
   copy.append(preview);
-  label.append(box, copy, element("span", "count", words.length + " 張"));
+  const counts = element("span", "count group-counts", words.length + " 張");
+  const markedCount = element("small");
+  groupMarkCounts.set(name, markedCount);
+  counts.append(markedCount);
+  label.append(box, copy, counts);
   byId("groups").append(label);
 }
 function selectAll(checked) {
   boxes.forEach(box => box.checked = checked);
   syncSelection();
 }
+byId("only-unfamiliar").onchange = syncSelection;
 byId("all").onclick = () => selectAll(true);
 byId("none").onclick = () => selectAll(false);
 byId("total").textContent = groups.size + " 組 · 共 " + WORDS.length + " 張";
 syncSelection();
 byId("start").onclick = () => {
-  deck = WORDS.filter(w => boxes.get(w.group).checked);
+  const onlyMarked = byId("only-unfamiliar").checked;
+  deck = WORDS.filter(word => boxes.get(word.group).checked && (!onlyMarked || marks.has(markKey(word))));
   if (!deck.length) return;
   byId("home").hidden = true;
   byId("study").hidden = false;
