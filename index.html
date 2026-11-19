@@ -1,0 +1,952 @@
+<!doctype html>
+<html lang="zh-HK">
+<head>
+<meta charset="utf-8">
+<script>
+// 詞庫：每行一張卡。gender 用 m（陽性）、f（陰性）、mf（兩者皆可）；非名詞填空字串。
+// 男女兩式合併時，fr 依陽性、陰性排列，以逗號分隔；article 可用「le / la」或同一個冠詞。
+const WORDS = [
+  {"group":"家族・朋友・人物","fr":"famille","article":"la","gender":"f","zh":"家庭、家人","ja":"家族","ex_fr":"Comment va votre famille ?","ex_zh":"你家人近來好嗎？","lang":"zh","zh_auto":false},
+  {"group":"家族・朋友・人物","fr":"parents","article":"les","gender":"m","zh":"雙親、父母","ja":"両親","ex_fr":"Vous voyez souvent vos parents ?","ex_zh":"你經常見你父母嗎？","lang":"zh","zh_auto":false},
+  {"group":"家族・朋友・人物","fr":"père","article":"le","gender":"m","zh":"父親","ja":"父","ex_fr":"Mon père est médecin.","ex_zh":"我爸爸係醫生。","lang":"zh","zh_auto":false},
+  {"group":"家族・朋友・人物","fr":"papa","article":"le","gender":"m","zh":"爸爸","ja":"お父さん","ex_fr":"Tu cherches ton papa ?","ex_zh":"你喺度搵爸爸嗎？","lang":"zh","zh_auto":false},
+  {"group":"家族・朋友・人物","fr":"mère","article":"la","gender":"f","zh":"母親","ja":"母","ex_fr":"Ma mère est japonaise.","ex_zh":"我媽媽係日本人。","lang":"zh","zh_auto":false},
+  {"group":"家族・朋友・人物","fr":"maman","article":"la","gender":"f","zh":"媽媽","ja":"お母さん","ex_fr":"Maman, tu peux m’aider ?","ex_zh":"媽媽，你可以幫我嗎？","lang":"zh","zh_auto":false},
+  {"group":"家族・朋友・人物","fr":"enfant","article":"l'","gender":"mf","zh":"小朋友、孩子","ja":"子供","ex_fr":"Je n’aime pas les enfants.","ex_zh":"我唔鍾意小朋友。","lang":"zh","zh_auto":false},
+  {"group":"家族・朋友・人物","fr":"fils","article":"le","gender":"m","zh":"兒子","ja":"息子","ex_fr":"Votre fils est toujours à l’étranger ?","ex_zh":"你兒子依然喺外國嗎？","lang":"zh","zh_auto":false},
+  {"group":"家族・朋友・人物","fr":"fille","article":"la","gender":"f","zh":"少女、女兒","ja":"少女、娘","ex_fr":"J’ai une fille de dix ans.","ex_zh":"我有個十歲嘅女兒。","lang":"zh","zh_auto":false},
+  {"group":"家族・朋友・人物","fr":"frère","article":"le","gender":"m","zh":"兄弟","ja":"兄弟","ex_fr":"Quel âge a ton grand frère ?","ex_zh":"你哥哥幾多歲？","lang":"zh","zh_auto":false},
+  {"group":"家族・朋友・人物","fr":"sœur","article":"la","gender":"f","zh":"姊妹","ja":"姉妹","ex_fr":"Ma petite sœur est styliste.","ex_zh":"我妹妹係時裝設計師。","lang":"zh","zh_auto":false},
+  {"group":"家族・朋友・人物","fr":"cousin, cousine","article":"le / la","gender":"mf","zh":"堂／表兄弟姊妹","ja":"いとこ","ex_fr":"J’ai un cousin en Allemagne.","ex_zh":"我有個表／堂兄弟喺德國。","lang":"zh","zh_auto":false},
+  {"group":"家族・朋友・人物","fr":"grand-père","article":"le","gender":"m","zh":"祖父、外祖父","ja":"祖父","ex_fr":"Vous avez le bonjour de mon grand-père.","ex_zh":"我爺爺／公公向你問好。","lang":"zh","zh_auto":false},
+  {"group":"家族・朋友・人物","fr":"grand-mère","article":"la","gender":"f","zh":"祖母、外祖母","ja":"祖母","ex_fr":"J’adore le couscous de ma grand-mère.","ex_zh":"我非常鍾意嫲嫲／婆婆整嘅古斯米。","lang":"zh","zh_auto":false},
+  {"group":"家族・朋友・人物","fr":"grands-parents","article":"les","gender":"m","zh":"祖父母、外祖父母","ja":"祖父母","ex_fr":"Mes grands-parents habitent loin.","ex_zh":"我祖父母／外祖父母住得好遠。","lang":"zh","zh_auto":false},
+  {"group":"家族・朋友・人物","fr":"petit-fils","article":"le","gender":"m","zh":"孫仔、外孫仔","ja":"孫息子","ex_fr":"Mon petit-fils vient me voir chaque dimanche.","ex_zh":"我孫仔每個星期日都嚟探我。","lang":"zh","zh_auto":false},
+  {"group":"家族・朋友・人物","fr":"petite-fille","article":"la","gender":"f","zh":"孫女、外孫女","ja":"孫娘","ex_fr":"Votre petite-fille est bien élevée.","ex_zh":"你孫女真係好有禮貌。","lang":"zh","zh_auto":false},
+  {"group":"家族・朋友・人物","fr":"oncle","article":"l'","gender":"m","zh":"叔伯、舅父、姑丈、姨丈","ja":"おじ","ex_fr":"Votre oncle aussi est journaliste ?","ex_zh":"你叔叔／舅父都係記者嗎？","lang":"zh","zh_auto":false},
+  {"group":"家族・朋友・人物","fr":"tante","article":"la","gender":"f","zh":"姑姐、姨媽、伯母、嬸嬸","ja":"おば","ex_fr":"Ma tante me donne souvent des conseils.","ex_zh":"我姨媽／姑姐經常畀我意見。","lang":"zh","zh_auto":false},
+  {"group":"家族・朋友・人物","fr":"ami(e)","article":"l'","gender":"mf","zh":"朋友","ja":"友だち","ex_fr":"J’aime bien boire avec mes amis.","ex_zh":"我鍾意同朋友一齊飲酒。","lang":"zh","zh_auto":false},
+  {"group":"家族・朋友・人物","fr":"garçon","article":"le","gender":"m","zh":"男仔、少年","ja":"少年","ex_fr":"C’est un garçon très sage.","ex_zh":"佢係個好乖嘅男仔。","lang":"zh","zh_auto":false},
+  {"group":"家族・朋友・人物","fr":"homme","article":"l'","gender":"m","zh":"男人、人類","ja":"男性、人間","ex_fr":"Les hommes sont des animaux aussi.","ex_zh":"人類都係動物。","lang":"zh","zh_auto":false},
+  {"group":"家族・朋友・人物","fr":"femme","article":"la","gender":"f","zh":"女人、妻子","ja":"女性、妻","ex_fr":"Je vous présente ma femme.","ex_zh":"我向你介紹我太太。","lang":"zh","zh_auto":false},
+  {"group":"家族・朋友・人物","fr":"mari","article":"le","gender":"m","zh":"丈夫","ja":"夫","ex_fr":"Son mari parle tout le temps !","ex_zh":"佢老公成日講嘢！","lang":"zh","zh_auto":false},
+  {"group":"家族・朋友・人物","fr":"madame","article":"la","gender":"f","zh":"女士、夫人（對已婚女性嘅稱呼）","ja":"（既婚女性に対して）…さん","ex_fr":"Bonjour, Madame !","ex_zh":"你好，女士！","lang":"zh","zh_auto":false},
+  {"group":"家族・朋友・人物","fr":"mademoiselle","article":"la","gender":"f","zh":"小姐（對未婚女性嘅稱呼）","ja":"（未婚女性に対して）…さん","ex_fr":"Vous cherchez quelque chose, Mademoiselle ?","ex_zh":"小姐，你喺度搵緊啲咩嗎？","lang":"zh","zh_auto":false},
+  {"group":"家族・朋友・人物","fr":"monsieur","article":"le","gender":"m","zh":"先生","ja":"（男性に対して）…さん","ex_fr":"Vous êtes Monsieur... ?","ex_zh":"請問你係……先生嗎？","lang":"zh","zh_auto":false},
+  {"group":"家族・朋友・人物","fr":"gens","article":"les","gender":"m","zh":"人們","ja":"人々","ex_fr":"Je ne connais pas les gens d’ici.","ex_zh":"我唔識呢度嘅人。","lang":"zh","zh_auto":false},
+  {"group":"家族・朋友・人物","fr":"copain, copine","article":"le / la","gender":"mf","zh":"朋友、戀人","ja":"恋人、友だち","ex_fr":"C’est un bon copain.","ex_zh":"佢係個好朋友。","lang":"zh","zh_auto":false},
+  {"group":"人生","fr":"vie","article":"la","gender":"f","zh":"人生、生活、生命","ja":"人生、生活、生命","ex_fr":"C’est la vie.","ex_zh":"人生就係咁。","lang":"zh","zh_auto":false},
+  {"group":"人生","fr":"mort","article":"la","gender":"f","zh":"死亡","ja":"死","ex_fr":"Je n’ai pas peur de la mort.","ex_zh":"我唔怕死。","lang":"zh","zh_auto":false},
+  {"group":"人生","fr":"naissance","article":"la","gender":"f","zh":"出生、誕生","ja":"誕生、出生","ex_fr":"Votre date de naissance, c’est... ?","ex_zh":"你嘅出生日期係……？","lang":"zh","zh_auto":false},
+  {"group":"人生","fr":"anniversaire","article":"l'","gender":"m","zh":"紀念日、生日","ja":"記念日、誕生日","ex_fr":"C’est quand, ton anniversaire ?","ex_zh":"你生日係幾時？","lang":"zh","zh_auto":false},
+  {"group":"人生","fr":"mariage","article":"le","gender":"m","zh":"結婚、婚姻","ja":"結婚","ex_fr":"Vous êtes pour le mariage homosexuel ?","ex_zh":"你贊成同性婚姻嗎？","lang":"zh","zh_auto":false},
+  {"group":"人生","fr":"rêve","article":"le","gender":"m","zh":"夢想、夢","ja":"夢","ex_fr":"Mon rêve, c’est de devenir pâtissière.","ex_zh":"我嘅夢想係成為甜品師。","lang":"zh","zh_auto":false},
+  {"group":"人生","fr":"amour","article":"l'","gender":"m","zh":"愛","ja":"愛","ex_fr":"C’est un gâteau fait avec amour.","ex_zh":"呢個係用愛心製作嘅蛋糕。","lang":"zh","zh_auto":false},
+  {"group":"心情","fr":"bonheur","article":"le","gender":"m","zh":"幸福","ja":"幸福","ex_fr":"Qu’est-ce que c’est, le bonheur ?","ex_zh":"幸福係咩？","lang":"zh","zh_auto":false},
+  {"group":"心情","fr":"malheur","article":"le","gender":"m","zh":"不幸、厄運","ja":"不幸、不運","ex_fr":"Ça porte malheur.","ex_zh":"咁樣會帶嚟厄運。","lang":"zh","zh_auto":false},
+  {"group":"心情","fr":"chance","article":"la","gender":"f","zh":"運氣","ja":"運","ex_fr":"Vous avez de la chance !","ex_zh":"你好好運呀！","lang":"zh","zh_auto":false},
+  {"group":"心情","fr":"courage","article":"le","gender":"m","zh":"勇氣","ja":"勇気","ex_fr":"Courage, vous êtes près du but !","ex_zh":"加油！你就快達到目標喇！","lang":"zh","zh_auto":false},
+  {"group":"心情","fr":"colère","article":"la","gender":"f","zh":"憤怒","ja":"怒り","ex_fr":"Je suis en colère contre lui.","ex_zh":"我對佢好嬲。","lang":"zh","zh_auto":false},
+  {"group":"心情","fr":"peur","article":"la","gender":"f","zh":"恐懼","ja":"恐怖","ex_fr":"Vous avez peur des chiens ?","ex_zh":"你怕狗嗎？","lang":"zh","zh_auto":false},
+  {"group":"心情","fr":"faim","article":"la","gender":"f","zh":"肚餓","ja":"空腹","ex_fr":"J’ai faim.","ex_zh":"我肚餓喇。","lang":"zh","zh_auto":false},
+  {"group":"心情","fr":"soif","article":"la","gender":"f","zh":"口渴","ja":"喉の渇き","ex_fr":"Vous n’avez pas soif, ça va ?","ex_zh":"你唔口渴嗎？冇問題嗎？","lang":"zh","zh_auto":false},
+  {"group":"心情","fr":"sommeil","article":"le","gender":"m","zh":"睡意","ja":"眠気","ex_fr":"Vous avez sommeil ?","ex_zh":"你眼瞓嗎？","lang":"zh","zh_auto":false},
+  {"group":"心情","fr":"besoin","article":"le","gender":"m","zh":"需要","ja":"必要","ex_fr":"J’ai besoin d’un nouveau smartphone.","ex_zh":"我需要一部新智能電話。","lang":"zh","zh_auto":false},
+  {"group":"心情","fr":"sens","article":"le","gender":"m","zh":"感覺、分別、意思","ja":"感覚、分別、意味","ex_fr":"Mais ça n’a pas de sens !","ex_zh":"但係咁樣根本冇道理！","lang":"zh","zh_auto":false},
+  {"group":"心情","fr":"envie","article":"l'","gender":"f","zh":"慾望、想做某事嘅心情","ja":"欲求","ex_fr":"J’ai envie d’aller aux toilettes.","ex_zh":"我想去廁所。","lang":"zh","zh_auto":false},
+  {"group":"住所・日用品","fr":"maison","article":"la","gender":"f","zh":"屋、家","ja":"家","ex_fr":"Ma maison est à vendre.","ex_zh":"我間屋放緊盤出售。","lang":"zh","zh_auto":false},
+  {"group":"住所・日用品","fr":"salle","article":"la","gender":"f","zh":"房間","ja":"部屋","ex_fr":"Vous savez où est la salle 203 ?","ex_zh":"你知唔知203室喺邊？","lang":"zh","zh_auto":false},
+  {"group":"住所・日用品","fr":"chambre","article":"la","gender":"f","zh":"睡房","ja":"寝室","ex_fr":"Ma chambre est assez grande.","ex_zh":"我間房都算幾大。","lang":"zh","zh_auto":false},
+  {"group":"住所・日用品","fr":"cuisine","article":"la","gender":"f","zh":"廚房、料理","ja":"台所、料理","ex_fr":"La cuisine est toute neuve.","ex_zh":"廚房係全新嘅。","lang":"zh","zh_auto":false},
+  {"group":"住所・日用品","fr":"bain","article":"le","gender":"m","zh":"浸浴、洗澡","ja":"入浴","ex_fr":"J’ai l’habitude de prendre un bain le soir.","ex_zh":"我習慣每晚浸浴。","lang":"zh","zh_auto":false},
+  {"group":"住所・日用品","fr":"toilettes","article":"les","gender":"f","zh":"廁所","ja":"トイレ","ex_fr":"Où sont les toilettes ?","ex_zh":"廁所喺邊？","lang":"zh","zh_auto":false},
+  {"group":"住所・日用品","fr":"escalier","article":"l'","gender":"m","zh":"樓梯","ja":"階段","ex_fr":"Elle prend toujours les escaliers.","ex_zh":"佢成日行樓梯。","lang":"zh","zh_auto":false},
+  {"group":"住所・日用品","fr":"étage","article":"l'","gender":"m","zh":"樓層","ja":"階","ex_fr":"Le rayon « hommes » est au deuxième étage.","ex_zh":"男裝部喺三樓。","lang":"zh","zh_auto":false},
+  {"group":"住所・日用品","fr":"jardin","article":"le","gender":"m","zh":"花園","ja":"庭","ex_fr":"J’aime bien les jardins japonais.","ex_zh":"我鍾意日式庭園。","lang":"zh","zh_auto":false},
+  {"group":"住所・日用品","fr":"fenêtre","article":"la","gender":"f","zh":"窗","ja":"窓","ex_fr":"Cette chambre n’a pas de fenêtres.","ex_zh":"呢間房冇窗。","lang":"zh","zh_auto":false},
+  {"group":"住所・日用品","fr":"lit","article":"le","gender":"m","zh":"床","ja":"ベッド","ex_fr":"Mon chat dort déjà sur le lit.","ex_zh":"我隻貓已經喺床上面瞓緊。","lang":"zh","zh_auto":false},
+  {"group":"住所・日用品","fr":"porte","article":"la","gender":"f","zh":"門","ja":"ドア","ex_fr":"Je ne peux pas ouvrir cette porte.","ex_zh":"我開唔到呢道門。","lang":"zh","zh_auto":false},
+  {"group":"隨身物品","fr":"clef","article":"la","gender":"f","zh":"鎖匙","ja":"鍵","ex_fr":"Tu as les clefs de la voiture ?","ex_zh":"你有冇車匙？","lang":"zh","zh_auto":false},
+  {"group":"隨身物品","fr":"table","article":"la","gender":"f","zh":"枱","ja":"テーブル","ex_fr":"Ton journal est sur la table.","ex_zh":"你份報紙喺枱上面。","lang":"zh","zh_auto":false},
+  {"group":"隨身物品","fr":"chaise","article":"la","gender":"f","zh":"椅","ja":"椅子","ex_fr":"Cette chaise n’est pas confortable.","ex_zh":"呢張椅坐得唔舒服。","lang":"zh","zh_auto":false},
+  {"group":"隨身物品","fr":"téléphone","article":"le","gender":"m","zh":"電話","ja":"電話","ex_fr":"Je peux avoir votre numéro de téléphone ?","ex_zh":"可以畀你個電話號碼我嗎？","lang":"zh","zh_auto":false},
+  {"group":"隨身物品","fr":"télévision","article":"la","gender":"f","zh":"電視","ja":"テレビ","ex_fr":"On le voit souvent à la télévision.","ex_zh":"我哋成日喺電視見到佢。","lang":"zh","zh_auto":false},
+  {"group":"隨身物品","fr":"radio","article":"la","gender":"f","zh":"收音機、電台","ja":"ラジオ","ex_fr":"J’écoute la radio sur Internet.","ex_zh":"我喺網上聽電台。","lang":"zh","zh_auto":false},
+  {"group":"隨身物品","fr":"ordinateur","article":"l'","gender":"m","zh":"電腦","ja":"コンピュータ","ex_fr":"Vous n’avez pas d’ordinateur ?","ex_zh":"你冇電腦嗎？","lang":"zh","zh_auto":false},
+  {"group":"隨身物品","fr":"stylo","article":"le","gender":"m","zh":"原子筆","ja":"ペン","ex_fr":"Est-ce que vous avez un stylo ?","ex_zh":"你有冇筆？","lang":"zh","zh_auto":false},
+  {"group":"隨身物品","fr":"crayon","article":"le","gender":"m","zh":"鉛筆","ja":"鉛筆","ex_fr":"Je fais un dessin au crayon.","ex_zh":"我用鉛筆畫畫。","lang":"zh","zh_auto":false},
+  {"group":"隨身物品","fr":"papier","article":"le","gender":"m","zh":"紙","ja":"紙","ex_fr":"Il n’y a plus de papier toilette.","ex_zh":"已經冇廁紙喇。","lang":"zh","zh_auto":false},
+  {"group":"隨身物品","fr":"gomme","article":"la","gender":"f","zh":"擦膠","ja":"消しゴム","ex_fr":"À qui est cette gomme ?","ex_zh":"呢嚿擦膠係邊個嘅？","lang":"zh","zh_auto":false},
+  {"group":"隨身物品","fr":"cahier","article":"le","gender":"m","zh":"筆記簿","ja":"ノート","ex_fr":"Je dois acheter un nouveau cahier.","ex_zh":"我要買本新筆記簿。","lang":"zh","zh_auto":false},
+  {"group":"隨身物品","fr":"chose","article":"la","gender":"f","zh":"東西、事情","ja":"もの、こと","ex_fr":"Il y a beaucoup de choses à manger.","ex_zh":"有好多嘢食。","lang":"zh","zh_auto":false},
+  {"group":"隨身物品","fr":"vêtement","article":"le","gender":"m","zh":"衣服","ja":"服","ex_fr":"Elle n’a que des vêtements noirs.","ex_zh":"佢得黑色衫。","lang":"zh","zh_auto":false},
+  {"group":"隨身物品","fr":"robe","article":"la","gender":"f","zh":"連身裙、洋裝","ja":"ドレス","ex_fr":"Je cherche une robe de soirée.","ex_zh":"我搵緊一條晚裝裙。","lang":"zh","zh_auto":false},
+  {"group":"隨身物品","fr":"chemise","article":"la","gender":"f","zh":"恤衫","ja":"シャツ","ex_fr":"Ta chemise est sale !","ex_zh":"你件恤衫好污糟！","lang":"zh","zh_auto":false},
+  {"group":"隨身物品","fr":"veste","article":"la","gender":"f","zh":"外套、西裝褸","ja":"上着、ジャケット","ex_fr":"Je peux avoir votre veste ?","ex_zh":"可以借你件外套畀我嗎？","lang":"zh","zh_auto":false},
+  {"group":"隨身物品","fr":"chapeau","article":"le","gender":"m","zh":"帽","ja":"帽子","ex_fr":"Votre chapeau est très élégant.","ex_zh":"你頂帽好高雅又時尚。","lang":"zh","zh_auto":false},
+  {"group":"隨身物品","fr":"lunettes","article":"les","gender":"f","zh":"眼鏡","ja":"メガネ","ex_fr":"Je ne trouve pas mes lunettes.","ex_zh":"我搵唔到副眼鏡。","lang":"zh","zh_auto":false},
+  {"group":"隨身物品","fr":"montre","article":"la","gender":"f","zh":"手錶","ja":"腕時計","ex_fr":"On a la même montre.","ex_zh":"我哋戴緊同款手錶。","lang":"zh","zh_auto":false},
+  {"group":"隨身物品","fr":"cravate","article":"la","gender":"f","zh":"領呔","ja":"ネクタイ","ex_fr":"Ta cravate est trop courte !","ex_zh":"你條領呔太短喇！","lang":"zh","zh_auto":false},
+  {"group":"隨身物品","fr":"chaussure","article":"la","gender":"f","zh":"鞋","ja":"靴","ex_fr":"Ces chaussures sont un peu petites.","ex_zh":"呢對鞋有啲細。","lang":"zh","zh_auto":false},
+  {"group":"隨身物品","fr":"pantalon","article":"le","gender":"m","zh":"長褲","ja":"ズボン","ex_fr":"Je n’entre plus dans ce pantalon.","ex_zh":"我已經着唔落呢條褲。","lang":"zh","zh_auto":false},
+  {"group":"隨身物品","fr":"jupe","article":"la","gender":"f","zh":"裙","ja":"スカート","ex_fr":"Cette jupe lui va bien.","ex_zh":"呢條裙好襯佢。","lang":"zh","zh_auto":false},
+  {"group":"隨身物品","fr":"poche","article":"la","gender":"f","zh":"衫袋、褲袋","ja":"ポケット","ex_fr":"Ce manteau n’a pas de poches.","ex_zh":"呢件大褸冇袋。","lang":"zh","zh_auto":false},
+  {"group":"隨身物品","fr":"sac","article":"le","gender":"m","zh":"袋","ja":"かばん","ex_fr":"J’aime bien les sacs en cuir.","ex_zh":"我鍾意皮袋。","lang":"zh","zh_auto":false},
+  {"group":"隨身物品","fr":"valise","article":"la","gender":"f","zh":"行李箱","ja":"スーツケース","ex_fr":"Vous avez combien de valises ?","ex_zh":"你有幾多個行李箱？","lang":"zh","zh_auto":false},
+  {"group":"隨身物品","fr":"parfum","article":"le","gender":"m","zh":"香水","ja":"香水","ex_fr":"Tu aimes mon nouveau parfum ?","ex_zh":"你鍾唔鍾意我支新香水？","lang":"zh","zh_auto":false},
+  {"group":"飲食","fr":"petit déjeuner","article":"le","gender":"m","zh":"早餐","ja":"朝食","ex_fr":"Elle mange des céréales au petit déjeuner.","ex_zh":"佢早餐食穀物片。","lang":"zh","zh_auto":false},
+  {"group":"飲食","fr":"déjeuner","article":"le","gender":"m","zh":"午餐","ja":"昼食","ex_fr":"Après le déjeuner, je fais une sieste.","ex_zh":"午飯後我會瞓晏覺。","lang":"zh","zh_auto":false},
+  {"group":"飲食","fr":"dîner","article":"le","gender":"m","zh":"晚餐","ja":"夕食","ex_fr":"On regarde la télé pendant le dîner.","ex_zh":"我哋食晚飯嗰陣睇電視。","lang":"zh","zh_auto":false},
+  {"group":"飲食","fr":"boisson","article":"la","gender":"f","zh":"飲品","ja":"飲み物","ex_fr":"Qu’est-ce que vous prenez comme boissons ?","ex_zh":"你想飲啲咩？","lang":"zh","zh_auto":false},
+  {"group":"飲食","fr":"bouteille","article":"la","gender":"f","zh":"樽","ja":"びん、ボトル","ex_fr":"Toutes ces bouteilles de vin, c’est à toi ?","ex_zh":"呢啲紅酒樽全部都係你嘅？","lang":"zh","zh_auto":false},
+  {"group":"飲食","fr":"verre","article":"le","gender":"m","zh":"玻璃杯","ja":"グラス","ex_fr":"Je prends un dernier verre et je rentre.","ex_zh":"我飲埋最後一杯就返去。","lang":"zh","zh_auto":false},
+  {"group":"飲食","fr":"vin","article":"le","gender":"m","zh":"葡萄酒","ja":"ワイン","ex_fr":"C’est un vin blanc sec.","ex_zh":"呢支係乾白葡萄酒。","lang":"zh","zh_auto":false},
+  {"group":"飲食","fr":"bière","article":"la","gender":"f","zh":"啤酒","ja":"ビール","ex_fr":"Il y a un pack de bières au frigo.","ex_zh":"雪櫃有一箱啤酒。","lang":"zh","zh_auto":false},
+  {"group":"飲食","fr":"café","article":"le","gender":"m","zh":"咖啡","ja":"コーヒー","ex_fr":"J’ai besoin d’un café pour me réveiller.","ex_zh":"我需要飲杯咖啡嚟醒神。","lang":"zh","zh_auto":false},
+  {"group":"飲食","fr":"thé","article":"le","gender":"m","zh":"茶","ja":"茶","ex_fr":"Elle est amoureuse du thé vert japonais.","ex_zh":"佢好鍾意日本綠茶。","lang":"zh","zh_auto":false},
+  {"group":"飲食","fr":"lait","article":"le","gender":"m","zh":"牛奶","ja":"牛乳","ex_fr":"Il boit du lait chaud avant de dormir.","ex_zh":"佢瞓覺前會飲熱牛奶。","lang":"zh","zh_auto":false},
+  {"group":"飲食","fr":"huile","article":"l'","gender":"f","zh":"油","ja":"油","ex_fr":"Il reste de l’huile d’olive ?","ex_zh":"仲有冇橄欖油剩？","lang":"zh","zh_auto":false},
+  {"group":"飲食","fr":"beurre","article":"le","gender":"m","zh":"牛油","ja":"バター","ex_fr":"Je mets du beurre dans la poêle.","ex_zh":"我喺平底鑊落牛油。","lang":"zh","zh_auto":false},
+  {"group":"飲食","fr":"œuf","article":"l'","gender":"m","zh":"蛋","ja":"卵","ex_fr":"Tu aimes les œufs sur le plat ?","ex_zh":"你鍾唔鍾意食太陽蛋？","lang":"zh","zh_auto":false},
+  {"group":"飲食","fr":"viande","article":"la","gender":"f","zh":"肉","ja":"肉","ex_fr":"Il ne mange plus de viande, maintenant.","ex_zh":"佢而家唔再食肉。","lang":"zh","zh_auto":false},
+  {"group":"飲食","fr":"porc","article":"le","gender":"m","zh":"豬肉、豬","ja":"豚肉、豚","ex_fr":"On prend des nems au porc ?","ex_zh":"我哋食豬肉春卷好唔好？","lang":"zh","zh_auto":false},
+  {"group":"飲食","fr":"poulet","article":"le","gender":"m","zh":"雞肉、雞","ja":"鶏肉、若鶏","ex_fr":"Je prépare un poulet rôti.","ex_zh":"我整緊烤雞。","lang":"zh","zh_auto":false},
+  {"group":"飲食","fr":"bœuf","article":"le","gender":"m","zh":"牛肉、牛","ja":"牛肉、牛","ex_fr":"C’est bon, le bœuf de Kobé ?","ex_zh":"神戶牛肉好唔好食？","lang":"zh","zh_auto":false},
+  {"group":"飲食","fr":"poisson","article":"le","gender":"m","zh":"魚","ja":"魚","ex_fr":"Ce poisson est très rare.","ex_zh":"呢條魚好罕見。","lang":"zh","zh_auto":false},
+  {"group":"飲食","fr":"légume","article":"le","gender":"m","zh":"蔬菜","ja":"野菜","ex_fr":"Vous ne mangez pas assez de légumes !","ex_zh":"你食得唔夠蔬菜呀！","lang":"zh","zh_auto":false},
+  {"group":"飲食","fr":"tomate","article":"la","gender":"f","zh":"番茄","ja":"トマト","ex_fr":"Tu es rouge comme une tomate !","ex_zh":"你紅到好似番茄咁！","lang":"zh","zh_auto":false},
+  {"group":"飲食","fr":"citron","article":"le","gender":"m","zh":"檸檬","ja":"レモン","ex_fr":"Vous pouvez mettre une rondelle de citron ?","ex_zh":"可以幫我放一片檸檬嗎？","lang":"zh","zh_auto":false},
+  {"group":"飲食","fr":"salade","article":"la","gender":"f","zh":"沙律","ja":"サラダ","ex_fr":"Je prends une grande salade.","ex_zh":"我要一份大沙律。","lang":"zh","zh_auto":false},
+  {"group":"飲食","fr":"pain","article":"le","gender":"m","zh":"麵包","ja":"パン","ex_fr":"Est-ce qu’on peut avoir du pain ?","ex_zh":"可以畀啲麵包我哋嗎？","lang":"zh","zh_auto":false},
+  {"group":"飲食","fr":"soupe","article":"la","gender":"f","zh":"湯","ja":"スープ","ex_fr":"Tu n’aimes pas la soupe aux lentilles ?","ex_zh":"你唔鍾意扁豆湯嗎？","lang":"zh","zh_auto":false},
+  {"group":"飲食","fr":"plat","article":"le","gender":"m","zh":"料理、主菜","ja":"料理、メイン","ex_fr":"C’est un plat très raffiné.","ex_zh":"呢道菜好精緻。","lang":"zh","zh_auto":false},
+  {"group":"飲食","fr":"sel","article":"le","gender":"m","zh":"鹽","ja":"塩","ex_fr":"Je trouve que ça manque de sel.","ex_zh":"我覺得呢個唔夠鹹。","lang":"zh","zh_auto":false},
+  {"group":"飲食","fr":"fruit","article":"le","gender":"m","zh":"水果","ja":"果物","ex_fr":"On n’a que des fruits, pour le dessert.","ex_zh":"甜品得水果咋。","lang":"zh","zh_auto":false},
+  {"group":"飲食","fr":"pomme","article":"la","gender":"f","zh":"蘋果","ja":"リンゴ","ex_fr":"Cette pomme est acide !","ex_zh":"呢個蘋果好酸！","lang":"zh","zh_auto":false},
+  {"group":"飲食","fr":"poire","article":"la","gender":"f","zh":"梨","ja":"洋梨","ex_fr":"Ces poires sont pourries.","ex_zh":"呢啲梨爛咗。","lang":"zh","zh_auto":false},
+  {"group":"飲食","fr":"orange","article":"l'","gender":"f","zh":"橙","ja":"オレンジ","ex_fr":"Un jus d’orange, s’il vous plaît.","ex_zh":"唔該一杯橙汁。","lang":"zh","zh_auto":false},
+  {"group":"飲食","fr":"banane","article":"la","gender":"f","zh":"香蕉","ja":"バナナ","ex_fr":"Cette banane vient des Philippines.","ex_zh":"呢隻香蕉係菲律賓產嘅。","lang":"zh","zh_auto":false},
+  {"group":"食物","fr":"fraise","article":"la","gender":"f","zh":"草莓","ja":"イチゴ","ex_fr":"Ces fraises sont excellentes.","ex_zh":"這些草莓非常好吃。","lang":"zh","zh_auto":true},
+  {"group":"食物","fr":"raisin","article":"le","gender":"m","zh":"葡萄","ja":"ブドウ","ex_fr":"On trouve ce raisin surtout en Turquie.","ex_zh":"這種葡萄主要產於土耳其。","lang":"zh","zh_auto":true},
+  {"group":"食物","fr":"riz","article":"le","gender":"m","zh":"米、飯","ja":"米","ex_fr":"Je fais cuire du riz.","ex_zh":"我煮米飯。","lang":"zh","zh_auto":true},
+  {"group":"食物","fr":"blé","article":"le","gender":"m","zh":"小麥","ja":"小麦","ex_fr":"Le blé complet, c’est bon pour la santé ?","ex_zh":"全麥對健康有益嗎？","lang":"zh","zh_auto":true},
+  {"group":"食物","fr":"glace","article":"la","gender":"f","zh":"雪糕","ja":"アイスクリーム","ex_fr":"Nous n’avons plus de glaces à la vanille.","ex_zh":"雲呢拿雪糕已經賣完了。","lang":"zh","zh_auto":true},
+  {"group":"食物","fr":"fromage","article":"le","gender":"m","zh":"芝士","ja":"チーズ","ex_fr":"Vous pouvez m’apporter la carte des fromages ?","ex_zh":"可以拿芝士餐牌給我嗎？","lang":"zh","zh_auto":true},
+  {"group":"方向","fr":"est","article":"l'","gender":"m","zh":"東","ja":"東","ex_fr":"L’Allemagne est à l’est de la France.","ex_zh":"德國位於法國東面。","lang":"zh","zh_auto":true},
+  {"group":"方向","fr":"ouest","article":"l'","gender":"m","zh":"西","ja":"西","ex_fr":"La Bretagne est dans l’ouest de la France.","ex_zh":"布列塔尼位於法國西面。","lang":"zh","zh_auto":true},
+  {"group":"方向","fr":"sud","article":"le","gender":"m","zh":"南","ja":"南","ex_fr":"Nice est dans le sud de la France.","ex_zh":"尼斯位於法國南部。","lang":"zh","zh_auto":true},
+  {"group":"方向","fr":"nord","article":"le","gender":"m","zh":"北","ja":"北","ex_fr":"Le Royaume-Uni est au nord de la France.","ex_zh":"英國位於法國北面。","lang":"zh","zh_auto":true},
+  {"group":"方向","fr":"droite","article":"la","gender":"f","zh":"右","ja":"右","ex_fr":"Qui est cette personne, à droite de lui ?","ex_zh":"他右邊那個人是誰？","lang":"zh","zh_auto":true},
+  {"group":"方向","fr":"gauche","article":"la","gender":"f","zh":"左","ja":"左","ex_fr":"Au Japon, on roule à gauche.","ex_zh":"日本的車輛靠左行駛。","lang":"zh","zh_auto":true},
+  {"group":"旅行","fr":"voyage","article":"le","gender":"m","zh":"旅行","ja":"旅行","ex_fr":"C’est un voyage pas comme les autres !","ex_zh":"這是一趟與別不同的旅行！","lang":"zh","zh_auto":true},
+  {"group":"旅行","fr":"voyageur, voyageuse","article":"le / la","gender":"mf","zh":"旅行者","ja":"旅行者","ex_fr":"L’aéroport est plein de voyageurs.","ex_zh":"機場擠滿旅客。","lang":"zh","zh_auto":true},
+  {"group":"旅行","fr":"touriste","article":"le / la","gender":"mf","zh":"觀光客","ja":"観光客","ex_fr":"Les touristes sont de plus en plus nombreux.","ex_zh":"遊客越來越多。","lang":"zh","zh_auto":true},
+  {"group":"旅行","fr":"séjour","article":"le","gender":"m","zh":"逗留","ja":"滞在","ex_fr":"Je fais un séjour linguistique aux États-Unis.","ex_zh":"我在美國參加語言遊學。","lang":"zh","zh_auto":true},
+  {"group":"旅行","fr":"monde","article":"le","gender":"m","zh":"世界、人們","ja":"世界、人々","ex_fr":"Il y a un monde fou ici !","ex_zh":"這裏有很多人！","lang":"zh","zh_auto":true},
+  {"group":"旅行","fr":"pays","article":"le","gender":"m","zh":"國家","ja":"国","ex_fr":"Vous venez de quel pays ?","ex_zh":"你來自哪個國家？","lang":"zh","zh_auto":true},
+  {"group":"旅行","fr":"culture","article":"la","gender":"f","zh":"文化","ja":"文化","ex_fr":"C’est un spécialiste de la culture chinoise.","ex_zh":"他是中國文化專家。","lang":"zh","zh_auto":true},
+  {"group":"旅行","fr":"vue","article":"la","gender":"f","zh":"景色、視野","ja":"眺め、視覚","ex_fr":"Il y a une vue superbe, d’ici.","ex_zh":"從這裏可以看到美麗的景色。","lang":"zh","zh_auto":true},
+  {"group":"旅行","fr":"plan","article":"le","gender":"m","zh":"地圖、計劃","ja":"地図、計画","ex_fr":"Je cherche un plan de la ville.","ex_zh":"我正在找城市地圖。","lang":"zh","zh_auto":true},
+  {"group":"旅行","fr":"passeport","article":"le","gender":"m","zh":"護照","ja":"パスポート","ex_fr":"Tu ne trouves plus ton passeport ?","ex_zh":"你找不到護照了嗎？","lang":"zh","zh_auto":true},
+  {"group":"旅行","fr":"absence","article":"l'","gender":"f","zh":"缺席、不在","ja":"留守","ex_fr":"En son absence, je le remplace.","ex_zh":"他不在時，由我代替他。","lang":"zh","zh_auto":true},
+  {"group":"旅行","fr":"rencontre","article":"la","gender":"f","zh":"相遇","ja":"出会い","ex_fr":"Je me souviens bien de notre rencontre !","ex_zh":"我很記得我們的相遇！","lang":"zh","zh_auto":true},
+  {"group":"交通","fr":"gare","article":"la","gender":"f","zh":"（大型）車站","ja":"（大きな）駅","ex_fr":"Le musée d’Orsay est une gare, à la base.","ex_zh":"奧賽博物館原本是一座車站。","lang":"zh","zh_auto":true},
+  {"group":"交通","fr":"train","article":"le","gender":"m","zh":"列車","ja":"列車","ex_fr":"On prend le train de neuf heures cinq.","ex_zh":"我們乘搭九點零五分的列車。","lang":"zh","zh_auto":true},
+  {"group":"交通","fr":"station","article":"la","gender":"f","zh":"（地下鐵等）車站","ja":"（地下鉄などの）駅","ex_fr":"La station n’a qu’une sortie.","ex_zh":"這個車站只有一個出口。","lang":"zh","zh_auto":true},
+  {"group":"交通","fr":"métro","article":"le","gender":"m","zh":"地下鐵","ja":"地下鉄","ex_fr":"C’est une nouvelle ligne de métro.","ex_zh":"這是新的地鐵路線。","lang":"zh","zh_auto":true},
+  {"group":"交通","fr":"vélo","article":"le","gender":"m","zh":"單車","ja":"自転車","ex_fr":"Il arrive enfin à monter à vélo !","ex_zh":"他終於學會踩單車了！","lang":"zh","zh_auto":true},
+  {"group":"交通","fr":"voiture","article":"la","gender":"f","zh":"汽車","ja":"自動車","ex_fr":"Où est-ce que tu vas garer la voiture ?","ex_zh":"你打算把車停在哪裏？","lang":"zh","zh_auto":true},
+  {"group":"交通","fr":"taxi","article":"le","gender":"m","zh":"的士","ja":"タクシー","ex_fr":"On va y aller en taxi.","ex_zh":"我們坐的士去吧。","lang":"zh","zh_auto":true},
+  {"group":"交通","fr":"bus","article":"le","gender":"m","zh":"巴士","ja":"バス","ex_fr":"Le bus est en retard de cinq minutes.","ex_zh":"巴士遲到五分鐘。","lang":"zh","zh_auto":true},
+  {"group":"交通","fr":"arrêt","article":"l'","gender":"m","zh":"停留處、車站","ja":"停留所","ex_fr":"« Prochain arrêt : Opéra. »","ex_zh":"「下一站：歌劇院。」","lang":"zh","zh_auto":true},
+  {"group":"交通","fr":"bateau","article":"le","gender":"m","zh":"船","ja":"船","ex_fr":"Ça doit être un bateau de pêche.","ex_zh":"那應該是一艘漁船。","lang":"zh","zh_auto":true},
+  {"group":"交通","fr":"avion","article":"l'","gender":"m","zh":"飛機","ja":"飛行機","ex_fr":"Son rêve, c’est d’être pilote d’avion.","ex_zh":"他的夢想是成為飛機師。","lang":"zh","zh_auto":true},
+  {"group":"交通","fr":"moto","article":"la","gender":"f","zh":"電單車","ja":"バイク","ex_fr":"Tu as le permis moto ?","ex_zh":"你有電單車駕駛執照嗎？","lang":"zh","zh_auto":true},
+  {"group":"街道・設施","fr":"grève","article":"la","gender":"f","zh":"罷工","ja":"ストライキ","ex_fr":"Tous les transports en commun sont en grève.","ex_zh":"所有公共交通工具都在罷工。","lang":"zh","zh_auto":true},
+  {"group":"街道・設施","fr":"ticket","article":"le","gender":"m","zh":"車票、門票","ja":"切符、チケット","ex_fr":"Il ne trouve plus son ticket !","ex_zh":"他找不到車票了！","lang":"zh","zh_auto":true},
+  {"group":"街道・設施","fr":"ville","article":"la","gender":"f","zh":"城市","ja":"街","ex_fr":"Elle veut retourner dans sa ville natale.","ex_zh":"她想回到故鄉。","lang":"zh","zh_auto":true},
+  {"group":"街道・設施","fr":"village","article":"le","gender":"m","zh":"村","ja":"村","ex_fr":"C’est un village avec beaucoup de charme.","ex_zh":"這是一個很有魅力的村莊。","lang":"zh","zh_auto":true},
+  {"group":"街道・設施","fr":"marché","article":"le","gender":"m","zh":"市場","ja":"市場","ex_fr":"Je vais faire quelques courses au marché.","ex_zh":"我要去市場買些東西。","lang":"zh","zh_auto":true},
+  {"group":"街道・設施","fr":"restaurant","article":"le","gender":"m","zh":"餐廳","ja":"レストラン","ex_fr":"C’est un restaurant étoilé !","ex_zh":"這是一間星級餐廳！","lang":"zh","zh_auto":true},
+  {"group":"街道・設施","fr":"boutique","article":"la","gender":"f","zh":"（小規模的）店","ja":"（小規模な）店","ex_fr":"Encore une boutique de souvenirs !","ex_zh":"又是一間手信店！","lang":"zh","zh_auto":true},
+  {"group":"街道・設施","fr":"magasin","article":"le","gender":"m","zh":"商店","ja":"（一般的に）商店","ex_fr":"Elle veut aller dans un magasin de jouets.","ex_zh":"她想去玩具店。","lang":"zh","zh_auto":true},
+  {"group":"街道・設施","fr":"boulangerie","article":"la","gender":"f","zh":"麵包店","ja":"パン屋","ex_fr":"Je prends une baguette à la boulangerie.","ex_zh":"我在麵包店買一條法包。","lang":"zh","zh_auto":true},
+  {"group":"街道・設施","fr":"pâtisserie","article":"la","gender":"f","zh":"糕餅店","ja":"ケーキ屋","ex_fr":"Une nouvelle pâtisserie vient d’ouvrir.","ex_zh":"一間新的糕餅店剛剛開業。","lang":"zh","zh_auto":true},
+  {"group":"街道・設施","fr":"boucherie","article":"la","gender":"f","zh":"肉店","ja":"肉屋","ex_fr":"Ils achètent leur viande à la boucherie.","ex_zh":"他們在肉店買肉。","lang":"zh","zh_auto":true},
+  {"group":"街道・設施","fr":"librairie","article":"la","gender":"f","zh":"書店","ja":"本屋","ex_fr":"Je préfère les petites librairies.","ex_zh":"我比較喜歡小書店。","lang":"zh","zh_auto":true},
+  {"group":"街道・設施","fr":"musée","article":"le","gender":"m","zh":"美術館、博物館","ja":"美術館","ex_fr":"Ce tableau est dans un musée belge.","ex_zh":"這幅畫在比利時的一間博物館裏。","lang":"zh","zh_auto":true},
+  {"group":"街道・設施","fr":"bibliothèque","article":"la","gender":"f","zh":"圖書館","ja":"図書館","ex_fr":"Je travaille mieux à la bibliothèque.","ex_zh":"我在圖書館比較能專心工作。","lang":"zh","zh_auto":true},
+  {"group":"街道・設施","fr":"cinéma","article":"le","gender":"m","zh":"電影院","ja":"映画館","ex_fr":"Tu m’attends devant le ciné ?","ex_zh":"你在電影院前面等我嗎？","lang":"zh","zh_auto":true},
+  {"group":"街道・設施","fr":"église","article":"l'","gender":"f","zh":"教堂","ja":"教会","ex_fr":"Ils vont se marier à l’église.","ex_zh":"他們將在教堂結婚。","lang":"zh","zh_auto":true},
+  {"group":"街道・設施","fr":"château","article":"le","gender":"m","zh":"城堡","ja":"城","ex_fr":"Qui habite dans ce château ?","ex_zh":"誰住在這座城堡裏？","lang":"zh","zh_auto":true},
+  {"group":"街道・設施","fr":"hôpital","article":"l'","gender":"m","zh":"醫院","ja":"病院","ex_fr":"Ton père est à l’hôpital.","ex_zh":"你爸爸正在醫院。","lang":"zh","zh_auto":true},
+  {"group":"街道・設施","fr":"hôtel","article":"l'","gender":"m","zh":"酒店","ja":"ホテル","ex_fr":"Tu te souviens de l’adresse de l’hôtel ?","ex_zh":"你記得酒店地址嗎？","lang":"zh","zh_auto":true},
+  {"group":"街道・設施","fr":"poste","article":"la","gender":"f","zh":"郵局","ja":"郵便局","ex_fr":"Il va récupérer un colis à la poste.","ex_zh":"他要去郵局取包裹。","lang":"zh","zh_auto":true},
+  {"group":"街道・設施","fr":"banque","article":"la","gender":"f","zh":"銀行","ja":"銀行","ex_fr":"Vous êtes à quelle banque ?","ex_zh":"你用哪間銀行？","lang":"zh","zh_auto":true},
+  {"group":"街道・設施","fr":"place","article":"la","gender":"f","zh":"廣場、座席","ja":"広場、座席","ex_fr":"Tout le monde danse sur la place.","ex_zh":"大家都在廣場跳舞。","lang":"zh","zh_auto":true},
+  {"group":"街道・設施","fr":"parc","article":"le","gender":"m","zh":"公園","ja":"公園","ex_fr":"Ils emmènent leur fils au parc.","ex_zh":"他們帶兒子去公園。","lang":"zh","zh_auto":true},
+  {"group":"街道・設施","fr":"tour","article":"la","gender":"f","zh":"塔","ja":"塔","ex_fr":"La tour Eiffel fait trois cent vingt-quatre mètres.","ex_zh":"艾菲爾鐵塔高324米。","lang":"zh","zh_auto":true},
+  {"group":"購物・金錢","fr":"bâtiment","article":"le","gender":"m","zh":"建築物","ja":"建物","ex_fr":"Le bâtiment est tout récent.","ex_zh":"這座建築物是最近建成的。","lang":"zh","zh_auto":true},
+  {"group":"購物・金錢","fr":"adresse","article":"l'","gender":"f","zh":"地址","ja":"住所","ex_fr":"Vous pouvez m’écrire votre adresse mail ?","ex_zh":"可以寫下你的電郵地址嗎？","lang":"zh","zh_auto":true},
+  {"group":"購物・金錢","fr":"rue","article":"la","gender":"f","zh":"街道","ja":"通り","ex_fr":"C’est au 55, rue du Faubourg Saint-Honoré.","ex_zh":"地址是聖奧諾雷市郊路55號。","lang":"zh","zh_auto":true},
+  {"group":"購物・金錢","fr":"argent","article":"l'","gender":"m","zh":"金錢","ja":"お金","ex_fr":"Je n’ai plus d’argent liquide sur moi.","ex_zh":"我身上沒有現金了。","lang":"zh","zh_auto":true},
+  {"group":"購物・金錢","fr":"billet","article":"le","gender":"m","zh":"紙幣、票","ja":"紙幣、券","ex_fr":"Il va casser son billet.","ex_zh":"他要把紙幣找開。","lang":"zh","zh_auto":true},
+  {"group":"購物・金錢","fr":"monnaie","article":"la","gender":"f","zh":"零錢、貨幣","ja":"小銭、釣り銭","ex_fr":"Vous avez la monnaie sur dix euros ?","ex_zh":"你有十歐元的零錢嗎？","lang":"zh","zh_auto":true},
+  {"group":"購物・金錢","fr":"prix","article":"le","gender":"m","zh":"價格","ja":"価格","ex_fr":"Les prix sont intéressants, ici.","ex_zh":"這裏的價格很吸引。","lang":"zh","zh_auto":true},
+  {"group":"購物・金錢","fr":"cadeau","article":"le","gender":"m","zh":"禮物","ja":"プレゼント","ex_fr":"Non ?! un cadeau pour moi ?","ex_zh":"不會吧？！這是送我的禮物？","lang":"zh","zh_auto":true},
+  {"group":"位置・形狀","fr":"centre","article":"le","gender":"m","zh":"中心","ja":"中心","ex_fr":"Il faut remettre le ballon au centre.","ex_zh":"必須把球放回中央。","lang":"zh","zh_auto":true},
+  {"group":"位置・形狀","fr":"milieu","article":"le","gender":"m","zh":"正中、環境","ja":"真ん中、環境","ex_fr":"Ils ne sont pas du même milieu.","ex_zh":"他們不是來自相同的社會階層。","lang":"zh","zh_auto":true},
+  {"group":"位置・形狀","fr":"coin","article":"le","gender":"m","zh":"角落、一角","ja":"片隅、一角","ex_fr":"Elle boude dans son coin.","ex_zh":"她在角落裏鬧彆扭。","lang":"zh","zh_auto":true},
+  {"group":"位置・形狀","fr":"bord","article":"le","gender":"m","zh":"邊緣、岸","ja":"縁、岸","ex_fr":"On va se balader au bord de la mer.","ex_zh":"我們要到海邊散步。","lang":"zh","zh_auto":true},
+  {"group":"位置・形狀","fr":"bout","article":"le","gender":"m","zh":"末端","ja":"先端","ex_fr":"Votre pied touche le bout de la chaussure ?","ex_zh":"你的腳趾碰到鞋頭嗎？","lang":"zh","zh_auto":true},
+  {"group":"位置・形狀","fr":"fond","article":"le","gender":"m","zh":"底、深處","ja":"底、核心","ex_fr":"Il y a quelque chose au fond.","ex_zh":"裏面深處有些東西。","lang":"zh","zh_auto":true},
+  {"group":"位置・形狀","fr":"côté","article":"le","gender":"m","zh":"側面、旁邊","ja":"側面","ex_fr":"Je m’assieds à côté d’elle.","ex_zh":"我坐在她旁邊。","lang":"zh","zh_auto":true},
+  {"group":"位置・形狀","fr":"point","article":"le","gender":"m","zh":"點","ja":"点","ex_fr":"Tu as combien de points sur ta carte ?","ex_zh":"你的卡有多少積分？","lang":"zh","zh_auto":true},
+  {"group":"位置・形狀","fr":"ligne","article":"la","gender":"f","zh":"線、列","ja":"線、列","ex_fr":"La ligne 4 est en travaux.","ex_zh":"四號線正在施工。","lang":"zh","zh_auto":true},
+  {"group":"位置・形狀","fr":"forme","article":"la","gender":"f","zh":"形狀、形式","ja":"形、形式","ex_fr":"J’aime bien la forme de cette voiture.","ex_zh":"我很喜歡這輛車的外形。","lang":"zh","zh_auto":true},
+  {"group":"位置・形狀","fr":"partie","article":"la","gender":"f","zh":"部分","ja":"部分","ex_fr":"Je viens de finir la première partie du livre.","ex_zh":"我剛看完這本書的第一部分。","lang":"zh","zh_auto":true},
+  {"group":"學校・教育","fr":"classe","article":"la","gender":"f","zh":"班級","ja":"クラス","ex_fr":"Elles sont toujours ensemble en classe.","ex_zh":"她們在班上總是在一起。","lang":"zh","zh_auto":true},
+  {"group":"學校・教育","fr":"cours","article":"le","gender":"m","zh":"課堂","ja":"授業","ex_fr":"Tu as quoi comme cours, là ?","ex_zh":"你現在有甚麼課？","lang":"zh","zh_auto":true},
+  {"group":"學校・教育","fr":"leçon","article":"la","gender":"f","zh":"課、課程","ja":"レッスン","ex_fr":"Il ne veut pas aller à sa leçon de piano.","ex_zh":"他不想去上鋼琴課。","lang":"zh","zh_auto":true},
+  {"group":"學校・教育","fr":"exercice","article":"l'","gender":"m","zh":"練習","ja":"練習","ex_fr":"Je ne comprends rien à cet exercice.","ex_zh":"我完全不明白這道練習題。","lang":"zh","zh_auto":true},
+  {"group":"學校・教育","fr":"exemple","article":"l'","gender":"m","zh":"例子","ja":"例","ex_fr":"Vous pouvez me donner un exemple ?","ex_zh":"可以給我一個例子嗎？","lang":"zh","zh_auto":true},
+  {"group":"學校・教育","fr":"examen","article":"l'","gender":"m","zh":"考試","ja":"試験","ex_fr":"J’ai un examen de français demain.","ex_zh":"我明天有法文考試。","lang":"zh","zh_auto":true},
+  {"group":"學校・教育","fr":"question","article":"la","gender":"f","zh":"問題","ja":"問題、質問","ex_fr":"Vous avez des questions ?","ex_zh":"你們有問題嗎？","lang":"zh","zh_auto":true},
+  {"group":"學校・教育","fr":"réponse","article":"la","gender":"f","zh":"答案、回覆","ja":"答え","ex_fr":"C’est une bonne réponse !","ex_zh":"這是個好答案！","lang":"zh","zh_auto":true},
+  {"group":"學校・教育","fr":"faute","article":"la","gender":"f","zh":"錯誤、過失","ja":"間違い、過ち","ex_fr":"Ce n’est pas (de) ta faute.","ex_zh":"這不是你的錯。","lang":"zh","zh_auto":true},
+  {"group":"學校・教育","fr":"erreur","article":"l'","gender":"f","zh":"錯誤、失誤","ja":"誤り、ミス、過失","ex_fr":"C’est une erreur de numéro.","ex_zh":"打錯電話號碼了。","lang":"zh","zh_auto":true},
+  {"group":"學校・教育","fr":"note","article":"la","gender":"f","zh":"筆記、分數","ja":"メモ、点数","ex_fr":"Elle a de bonnes notes partout.","ex_zh":"她各科成績都很好。","lang":"zh","zh_auto":true},
+  {"group":"學校・教育","fr":"école","article":"l'","gender":"f","zh":"學校","ja":"学校","ex_fr":"On est amis depuis l’école primaire.","ex_zh":"我們從小學開始就是朋友。","lang":"zh","zh_auto":true},
+  {"group":"學校・教育","fr":"collège","article":"le","gender":"m","zh":"中學校","ja":"中学校","ex_fr":"Ils sont au collège.","ex_zh":"他們在讀初中。","lang":"zh","zh_auto":true},
+  {"group":"學校・教育","fr":"lycée","article":"le","gender":"m","zh":"高中","ja":"高校","ex_fr":"Elle est professeure d’anglais au lycée.","ex_zh":"她是高中的英文老師。","lang":"zh","zh_auto":true},
+  {"group":"興趣・運動","fr":"jeu","article":"le","gender":"m","zh":"遊戲","ja":"ゲーム","ex_fr":"C’est un fan de jeux vidéo.","ex_zh":"他是電子遊戲迷。","lang":"zh","zh_auto":true},
+  {"group":"興趣・運動","fr":"dessin","article":"le","gender":"m","zh":"畫、圖畫","ja":"絵、デッサン","ex_fr":"C’est un dessin de quoi ?","ex_zh":"這是畫甚麼的？","lang":"zh","zh_auto":true},
+  {"group":"興趣・運動","fr":"peinture","article":"la","gender":"f","zh":"繪畫","ja":"絵画","ex_fr":"Manet est un grand maître de la peinture.","ex_zh":"馬奈是繪畫大師。","lang":"zh","zh_auto":true},
+  {"group":"興趣・運動","fr":"photo","article":"la","gender":"f","zh":"照片","ja":"写真","ex_fr":"Vous pouvez nous prendre en photo ?","ex_zh":"可以幫我們拍照嗎？","lang":"zh","zh_auto":true},
+  {"group":"興趣・運動","fr":"musique","article":"la","gender":"f","zh":"音樂","ja":"音楽","ex_fr":"Qu’est-ce que vous aimez comme musique ?","ex_zh":"你喜歡甚麼音樂？","lang":"zh","zh_auto":true},
+  {"group":"興趣・運動","fr":"piano","article":"le","gender":"m","zh":"鋼琴","ja":"ピアノ","ex_fr":"C’est une sonate pour piano.","ex_zh":"這是一首鋼琴奏鳴曲。","lang":"zh","zh_auto":true},
+  {"group":"興趣・運動","fr":"guitare","article":"la","gender":"f","zh":"結他","ja":"ギター","ex_fr":"Tu joues de la guitare classique ?","ex_zh":"你彈古典結他嗎？","lang":"zh","zh_auto":true},
+  {"group":"興趣・運動","fr":"violon","article":"le","gender":"m","zh":"小提琴","ja":"バイオリン","ex_fr":"J’aime beaucoup le son du violon.","ex_zh":"我很喜歡小提琴的聲音。","lang":"zh","zh_auto":true},
+  {"group":"興趣・運動","fr":"chanson","article":"la","gender":"f","zh":"歌曲","ja":"歌","ex_fr":"Cette chanson est triste.","ex_zh":"這首歌很傷感。","lang":"zh","zh_auto":true},
+  {"group":"興趣・運動","fr":"film","article":"le","gender":"m","zh":"電影","ja":"映画","ex_fr":"Vous avez un film préféré ?","ex_zh":"你有喜歡的電影嗎？","lang":"zh","zh_auto":true},
+  {"group":"興趣・運動","fr":"fête","article":"la","gender":"f","zh":"節日、派對","ja":"祭、パーティー","ex_fr":"Les voisins font la fête.","ex_zh":"鄰居正在開派對。","lang":"zh","zh_auto":true},
+  {"group":"興趣・運動","fr":"théâtre","article":"le","gender":"m","zh":"劇場","ja":"演劇","ex_fr":"Je suis au club théâtre de mon lycée.","ex_zh":"我參加了高中的戲劇社。","lang":"zh","zh_auto":true},
+  {"group":"興趣・運動","fr":"rôle","article":"le","gender":"m","zh":"角色","ja":"役","ex_fr":"Il est parfait pour ce rôle.","ex_zh":"他非常適合這個角色。","lang":"zh","zh_auto":true},
+  {"group":"興趣・運動","fr":"sport","article":"le","gender":"m","zh":"運動","ja":"スポーツ","ex_fr":"Elle aime bien faire du sport.","ex_zh":"她很喜歡做運動。","lang":"zh","zh_auto":true},
+  {"group":"興趣・運動","fr":"match","article":"le","gender":"m","zh":"比賽","ja":"試合","ex_fr":"Le match commence dans dix minutes.","ex_zh":"比賽十分鐘後開始。","lang":"zh","zh_auto":true},
+  {"group":"興趣・運動","fr":"équipe","article":"l'","gender":"f","zh":"隊伍","ja":"チーム","ex_fr":"C’est le capitaine de l’équipe de Belgique.","ex_zh":"他是比利時隊的隊長。","lang":"zh","zh_auto":true},
+  {"group":"興趣・運動","fr":"ski","article":"le","gender":"m","zh":"滑雪","ja":"スキー","ex_fr":"Ils font du ski chaque hiver.","ex_zh":"他們每年冬天都去滑雪。","lang":"zh","zh_auto":true},
+  {"group":"興趣・運動","fr":"natation","article":"la","gender":"f","zh":"游泳","ja":"水泳","ex_fr":"Je suis nul en natation.","ex_zh":"我不擅長游泳。","lang":"zh","zh_auto":true},
+  {"group":"興趣・運動","fr":"tennis","article":"le","gender":"m","zh":"網球","ja":"テニス","ex_fr":"Roland-Garros, c’est une compétition de tennis.","ex_zh":"法國網球公開賽是一項網球賽事。","lang":"zh","zh_auto":true},
+  {"group":"興趣・運動","fr":"football","article":"le","gender":"m","zh":"足球","ja":"サッカー","ex_fr":"Je fais du foot en salle.","ex_zh":"我踢室內足球。","lang":"zh","zh_auto":true},
+  {"group":"興趣・運動","fr":"balle","article":"la","gender":"f","zh":"（小型的）球","ja":"（小さめの）ボール","ex_fr":"Le chien court après la balle.","ex_zh":"狗追著球跑。","lang":"zh","zh_auto":true},
+  {"group":"興趣・運動","fr":"ballon","article":"le","gender":"m","zh":"（大型的）球","ja":"（大きめの）ボール","ex_fr":"Tu as un ballon de basket ?","ex_zh":"你有籃球嗎？","lang":"zh","zh_auto":true},
+  {"group":"興趣・運動","fr":"vacances","article":"les","gender":"f","zh":"假期","ja":"バカンス","ex_fr":"C’est bientôt les vacances d’été !","ex_zh":"很快就是暑假了！","lang":"zh","zh_auto":true},
+  {"group":"興趣・運動","fr":"rendez-vous","article":"le","gender":"m","zh":"約會、預約","ja":"会う約束","ex_fr":"J’ai un rendez-vous avec un client.","ex_zh":"我約了客戶見面。","lang":"zh","zh_auto":true},
+  {"group":"興趣・運動","fr":"visite","article":"la","gender":"f","zh":"訪問、參觀","ja":"訪問","ex_fr":"Quel est l’objet de votre visite ?","ex_zh":"請問你來訪的目的是甚麼？","lang":"zh","zh_auto":true},
+  {"group":"興趣・運動","fr":"travail","article":"le","gender":"m","zh":"工作","ja":"仕事","ex_fr":"Qu’est-ce que vous faites comme travail ?","ex_zh":"你做甚麼工作？","lang":"zh","zh_auto":true},
+  {"group":"興趣・運動","fr":"habitude","article":"l'","gender":"f","zh":"習慣","ja":"習慣","ex_fr":"Je n’ai pas l’habitude de voyager seul.","ex_zh":"我不習慣獨自旅行。","lang":"zh","zh_auto":true},
+  {"group":"時間","fr":"date","article":"la","gender":"f","zh":"日期","ja":"日付","ex_fr":"Quelle est la date limite pour s'inscrire ?","ex_zh":"報名截止日期係幾時？","lang":"zh","zh_auto":true},
+  {"group":"時間","fr":"matin","article":"le","gender":"m","zh":"早上","ja":"朝","ex_fr":"Tous les matins, je fais un footing.","ex_zh":"我每日朝早都會跑步。","lang":"zh","zh_auto":true},
+  {"group":"時間","fr":"matinée","article":"la","gender":"f","zh":"上午","ja":"午前中","ex_fr":"Il va pleuvoir pendant toute la matinée.","ex_zh":"成個上午都會落雨。","lang":"zh","zh_auto":true},
+  {"group":"時間","fr":"jour","article":"le","gender":"m","zh":"日、一天","ja":"（時間の単位の）日","ex_fr":"Je prends quelques jours de congé.","ex_zh":"我請幾日假。","lang":"zh","zh_auto":true},
+  {"group":"時間","fr":"journée","article":"la","gender":"f","zh":"一整日","ja":"一日、昼間","ex_fr":"Vous avez passé une bonne journée ?","ex_zh":"你今日過得愉快嗎？","lang":"zh","zh_auto":true},
+  {"group":"時間","fr":"midi","article":"le","gender":"m","zh":"正午","ja":"正午","ex_fr":"Il faut quitter la chambre à midi.","ex_zh":"必須喺正午退房。","lang":"zh","zh_auto":true},
+  {"group":"時間","fr":"après-midi","article":"l'","gender":"m","zh":"下午","ja":"午後","ex_fr":"On commence l'apéro en fin d'après-midi.","ex_zh":"我哋喺傍晚前開始飲餐前酒。","lang":"zh","zh_auto":true},
+  {"group":"時間","fr":"soir","article":"le","gender":"m","zh":"傍晚、晚上","ja":"夕方","ex_fr":"On se voit demain soir ?","ex_zh":"聽晚見面好嗎？","lang":"zh","zh_auto":true},
+  {"group":"時間","fr":"soirée","article":"la","gender":"f","zh":"晚上、晚間聚會","ja":"晩、夜のパーティー","ex_fr":"C'est une soirée privée.","ex_zh":"呢個係私人派對。","lang":"zh","zh_auto":true},
+  {"group":"時間","fr":"nuit","article":"la","gender":"f","zh":"夜晚","ja":"夜","ex_fr":"Il fait nuit noire.","ex_zh":"夜色漆黑。","lang":"zh","zh_auto":true},
+  {"group":"時間","fr":"minuit","article":"le","gender":"m","zh":"午夜","ja":"真夜中","ex_fr":"Il est déjà minuit !","ex_zh":"已經午夜十二點喇！","lang":"zh","zh_auto":true},
+  {"group":"時間","fr":"temps","article":"le","gender":"m","zh":"時間、天氣","ja":"時間、天気","ex_fr":"Vous avez un peu de temps, là ?","ex_zh":"你而家有少少時間嗎？","lang":"zh","zh_auto":true},
+  {"group":"時間","fr":"demi","article":"le","gender":"m","zh":"一半","ja":"２分の１、グラスビール","ex_fr":"Je vais prendre un demi.","ex_zh":"我要一杯半品脫啤酒。","lang":"zh","zh_auto":true},
+  {"group":"時間","fr":"quart","article":"le","gender":"m","zh":"四分之一","ja":"４分の１","ex_fr":"Il est sept heures et quart.","ex_zh":"而家七點十五分。","lang":"zh","zh_auto":true},
+  {"group":"時間","fr":"moitié","article":"la","gender":"f","zh":"一半","ja":"半分","ex_fr":"Tu veux la moitié de mon gâteau ?","ex_zh":"你想要我蛋糕嘅一半嗎？","lang":"zh","zh_auto":true},
+  {"group":"時間","fr":"numéro","article":"le","gender":"m","zh":"號碼","ja":"番号","ex_fr":"Je vous laisse mon numéro de portable.","ex_zh":"我留低手機號碼畀你。","lang":"zh","zh_auto":true},
+  {"group":"時間","fr":"chiffre","article":"le","gender":"m","zh":"數字","ja":"数字","ex_fr":"Vous pouvez lire les chiffres romains ?","ex_zh":"你識讀羅馬數字嗎？","lang":"zh","zh_auto":true},
+  {"group":"時間","fr":"fois","article":"la","gender":"f","zh":"次、回","ja":"…回","ex_fr":"Je fais de la muscu deux fois par semaine.","ex_zh":"我每星期做兩次肌肉訓練。","lang":"zh","zh_auto":true},
+  {"group":"動物","fr":"animal","article":"l'","gender":"m","zh":"動物","ja":"（人間を含む）動物","ex_fr":"Vous avez un animal de compagnie ?","ex_zh":"你有養寵物嗎？","lang":"zh","zh_auto":true},
+  {"group":"動物","fr":"chat, chatte","article":"le / la","gender":"mf","zh":"貓","ja":"猫","ex_fr":"Le chat doit avoir faim.","ex_zh":"隻貓應該肚餓。","lang":"zh","zh_auto":true},
+  {"group":"動物","fr":"cheval","article":"le","gender":"m","zh":"馬","ja":"馬","ex_fr":"Tu sais monter à cheval ?","ex_zh":"你識騎馬嗎？","lang":"zh","zh_auto":true},
+  {"group":"動物","fr":"chien, chienne","article":"le / la","gender":"mf","zh":"狗","ja":"犬","ex_fr":"Je promène mon chien.","ex_zh":"我帶隻狗散步。","lang":"zh","zh_auto":true},
+  {"group":"動物","fr":"oiseau","article":"l'","gender":"m","zh":"鳥","ja":"鳥","ex_fr":"Les oiseaux chantent depuis ce matin.","ex_zh":"啲雀仔由今朝開始一直唱歌。","lang":"zh","zh_auto":true},
+  {"group":"動物","fr":"vache","article":"la","gender":"f","zh":"母牛","ja":"雌牛","ex_fr":"Les vaches mangent de l'herbe.","ex_zh":"啲牛食草。","lang":"zh","zh_auto":true},
+  {"group":"自然・地形","fr":"nature","article":"la","gender":"f","zh":"自然","ja":"自然","ex_fr":"On passe un week-end en pleine nature.","ex_zh":"我哋喺大自然中度過週末。","lang":"zh","zh_auto":true},
+  {"group":"自然・地形","fr":"fleur","article":"la","gender":"f","zh":"花","ja":"花","ex_fr":"Vous connaissez les fleurs de courgette ?","ex_zh":"你見過翠玉瓜花嗎？","lang":"zh","zh_auto":true},
+  {"group":"自然・地形","fr":"arbre","article":"l'","gender":"m","zh":"樹木","ja":"樹木","ex_fr":"L'arbre est en fleur.","ex_zh":"棵樹開緊花。","lang":"zh","zh_auto":true},
+  {"group":"自然・地形","fr":"feuille","article":"la","gender":"f","zh":"葉","ja":"葉っぱ","ex_fr":"Je ramasse les feuilles mortes.","ex_zh":"我執起啲落葉。","lang":"zh","zh_auto":true},
+  {"group":"自然・地形","fr":"bois","article":"le","gender":"m","zh":"樹林、木材","ja":"林、材木","ex_fr":"On campe dans un bois.","ex_zh":"我哋喺樹林露營。","lang":"zh","zh_auto":true},
+  {"group":"自然・地形","fr":"forêt","article":"la","gender":"f","zh":"森林","ja":"森","ex_fr":"Je visite la forêt de Brocéliande.","ex_zh":"我去參觀布羅塞利昂德森林。","lang":"zh","zh_auto":true},
+  {"group":"自然・地形","fr":"montagne","article":"la","gender":"f","zh":"山","ja":"山","ex_fr":"Elle préfère la mer à la montagne.","ex_zh":"佢鍾意海多過山。","lang":"zh","zh_auto":true},
+  {"group":"自然・地形","fr":"terre","article":"la","gender":"f","zh":"地面、土地","ja":"地面","ex_fr":"Ils dorment par terre.","ex_zh":"佢哋瞓喺地上。","lang":"zh","zh_auto":true},
+  {"group":"自然・地形","fr":"mer","article":"la","gender":"f","zh":"海","ja":"海","ex_fr":"J'adore passer les vacances à la mer.","ex_zh":"我最鍾意去海邊度假。","lang":"zh","zh_auto":true},
+  {"group":"自然・地形","fr":"île","article":"l'","gender":"f","zh":"島","ja":"島","ex_fr":"Il veut acheter une île déserte.","ex_zh":"佢想買一個無人島。","lang":"zh","zh_auto":true},
+  {"group":"自然・地形","fr":"lac","article":"le","gender":"m","zh":"湖","ja":"湖","ex_fr":"Ils se baignent dans le lac.","ex_zh":"佢哋喺湖度游水。","lang":"zh","zh_auto":true},
+  {"group":"自然・地形","fr":"fleuve","article":"le","gender":"m","zh":"大河","ja":"大河","ex_fr":"La Loire est le plus long fleuve de France.","ex_zh":"羅亞爾河係法國最長嘅河流。","lang":"zh","zh_auto":true},
+  {"group":"自然・天氣","fr":"ciel","article":"le","gender":"m","zh":"天空","ja":"空","ex_fr":"Le ciel est magnifique aujourd'hui.","ex_zh":"今日天空好靚。","lang":"zh","zh_auto":true},
+  {"group":"自然・天氣","fr":"pluie","article":"la","gender":"f","zh":"雨","ja":"雨","ex_fr":"Je déteste la pluie.","ex_zh":"我討厭落雨。","lang":"zh","zh_auto":true},
+  {"group":"自然・天氣","fr":"neige","article":"la","gender":"f","zh":"雪","ja":"雪","ex_fr":"On va faire un bonhomme de neige ?","ex_zh":"我哋整個雪人好嗎？","lang":"zh","zh_auto":true},
+  {"group":"自然・天氣","fr":"nuage","article":"le","gender":"m","zh":"雲","ja":"雲","ex_fr":"Les nuages sont bien gris.","ex_zh":"啲雲灰濛濛。","lang":"zh","zh_auto":true},
+  {"group":"自然・天氣","fr":"vent","article":"le","gender":"m","zh":"風","ja":"風","ex_fr":"Le vent souffle fort.","ex_zh":"風好大。","lang":"zh","zh_auto":true},
+  {"group":"自然・天氣","fr":"soleil","article":"le","gender":"m","zh":"太陽","ja":"太陽","ex_fr":"Ne regarde pas trop longtemps le soleil.","ex_zh":"唔好望住太陽太耐。","lang":"zh","zh_auto":true},
+  {"group":"自然・天氣","fr":"étoile","article":"l'","gender":"f","zh":"星星","ja":"星","ex_fr":"On voit bien les étoiles ce soir.","ex_zh":"今晚啲星星睇得好清楚。","lang":"zh","zh_auto":true},
+  {"group":"自然・天氣","fr":"lune","article":"la","gender":"f","zh":"月亮","ja":"月","ex_fr":"C'est la pleine lune aujourd'hui.","ex_zh":"今日係滿月。","lang":"zh","zh_auto":true},
+  {"group":"自然・天氣","fr":"lumière","article":"la","gender":"f","zh":"光","ja":"光","ex_fr":"Tu peux allumer la lumière ?","ex_zh":"你可以開燈嗎？","lang":"zh","zh_auto":true},
+  {"group":"自然・天氣","fr":"ombre","article":"l'","gender":"f","zh":"陰影","ja":"陰、影","ex_fr":"Ils vont se mettre à l'ombre.","ex_zh":"佢哋會去陰涼處。","lang":"zh","zh_auto":true},
+  {"group":"自然・天氣","fr":"eau","article":"l'","gender":"f","zh":"水","ja":"水","ex_fr":"Je n'aime pas trop l'eau gazeuse.","ex_zh":"我唔係太鍾意有氣水。","lang":"zh","zh_auto":true},
+  {"group":"自然・天氣","fr":"feu","article":"le","gender":"m","zh":"火","ja":"火","ex_fr":"Excusez-moi, vous avez du feu ?","ex_zh":"唔好意思，你有火嗎？","lang":"zh","zh_auto":true},
+  {"group":"身體","fr":"corps","article":"le","gender":"m","zh":"身體","ja":"身体","ex_fr":"Je n'ai plus de crème pour le corps.","ex_zh":"我冇晒身體乳霜。","lang":"zh","zh_auto":true},
+  {"group":"身體","fr":"tête","article":"la","gender":"f","zh":"頭","ja":"頭","ex_fr":"Il a mal à la tête depuis ce matin.","ex_zh":"佢由今朝開始就頭痛。","lang":"zh","zh_auto":true},
+  {"group":"身體","fr":"main","article":"la","gender":"f","zh":"手","ja":"手","ex_fr":"Il faut se laver les mains avant de manger.","ex_zh":"食飯前要洗手。","lang":"zh","zh_auto":true},
+  {"group":"身體","fr":"pied","article":"le","gender":"m","zh":"腳","ja":"足","ex_fr":"J'ai des fourmis dans les pieds.","ex_zh":"我雙腳麻痺。","lang":"zh","zh_auto":true},
+  {"group":"身體","fr":"bras","article":"le","gender":"m","zh":"手臂","ja":"腕","ex_fr":"C'est le bras droit du chef.","ex_zh":"我有供主廚倚重嘅得力助手。","lang":"zh","zh_auto":true},
+  {"group":"身體","fr":"jambe","article":"la","gender":"f","zh":"腿","ja":"脚","ex_fr":"J'ai les jambes lourdes.","ex_zh":"我雙腳好攰。","lang":"zh","zh_auto":true},
+  {"group":"身體","fr":"cœur","article":"le","gender":"m","zh":"心臟、心","ja":"心臓、ハート、中心","ex_fr":"Nous sommes au cœur historique de la ville.","ex_zh":"我哋位於城市歷史中心。","lang":"zh","zh_auto":true},
+  {"group":"身體","fr":"visage","article":"le","gender":"m","zh":"臉","ja":"顔","ex_fr":"Il a un très beau visage.","ex_zh":"佢塊面好靚。","lang":"zh","zh_auto":true},
+  {"group":"身體","fr":"œil","article":"l'","gender":"m","zh":"眼睛","ja":"眼","ex_fr":"Vous avez des gouttes pour les yeux ?","ex_zh":"你有眼藥水嗎？","lang":"zh","zh_auto":true},
+  {"group":"身體","fr":"nez","article":"le","gender":"m","zh":"鼻","ja":"鼻","ex_fr":"Elle a le nez bouché.","ex_zh":"佢鼻塞。","lang":"zh","zh_auto":true},
+  {"group":"身體","fr":"bouche","article":"la","gender":"f","zh":"嘴巴","ja":"口","ex_fr":"J'ai encore du dentifrice dans la bouche.","ex_zh":"我嘴入面仲有牙膏。","lang":"zh","zh_auto":true},
+  {"group":"身體","fr":"oreille","article":"l'","gender":"f","zh":"耳朵","ja":"耳","ex_fr":"Peu de gens ont l'oreille absolue.","ex_zh":"好少人有絕對音感。","lang":"zh","zh_auto":true},
+  {"group":"基本動詞","fr":"avoir","article":"","gender":"","zh":"有","ja":"…を持つ","ex_fr":"Vous avez des mouchoirs en papier ?","ex_zh":"你有紙巾嗎？","lang":"zh","zh_auto":true},
+  {"group":"基本動詞","fr":"être","article":"","gender":"","zh":"是、處於","ja":"…である、…にいる","ex_fr":"Je suis vraiment fatigué.","ex_zh":"我真係好攰。","lang":"zh","zh_auto":true},
+  {"group":"基本動詞","fr":"faire","article":"","gender":"","zh":"做","ja":"…する、…を作る","ex_fr":"Elle a fait un cheesecake !","ex_zh":"佢整咗芝士蛋糕！","lang":"zh","zh_auto":true},
+  {"group":"基本動詞","fr":"aller","article":"","gender":"","zh":"去","ja":"行く","ex_fr":"Nous allons au même endroit.","ex_zh":"我哋去同一個地方。","lang":"zh","zh_auto":true},
+  {"group":"基本動詞","fr":"venir","article":"","gender":"","zh":"來","ja":"来る","ex_fr":"Vous venez avec nous ?","ex_zh":"你同我哋一齊嚟嗎？","lang":"zh","zh_auto":true},
+  {"group":"基本動詞","fr":"devoir","article":"","gender":"","zh":"必須、應該","ja":"…しなければならない、…に違いない","ex_fr":"Vous devez signer ici.","ex_zh":"你必須喺呢度簽名。","lang":"zh","zh_auto":true},
+  {"group":"基本動詞","fr":"pouvoir","article":"","gender":"","zh":"能夠、可以","ja":"…できる、…かもしれない","ex_fr":"Tu peux le faire !","ex_zh":"你做得到！","lang":"zh","zh_auto":true},
+  {"group":"基本動詞","fr":"vouloir","article":"","gender":"","zh":"想要","ja":"…したい","ex_fr":"Elle ne veut pas faire d'efforts.","ex_zh":"佢唔想努力。","lang":"zh","zh_auto":true},
+  {"group":"基本動詞","fr":"falloir","article":"","gender":"","zh":"必須","ja":"…すべきだ","ex_fr":"Il faut changer à la station Châtelet.","ex_zh":"必須喺 Châtelet 站轉車。","lang":"zh","zh_auto":true},
+  {"group":"基本動詞","fr":"laisser","article":"","gender":"","zh":"讓、留下","ja":"残す、…させておく","ex_fr":"Il a laissé tous les poivrons !","ex_zh":"佢將所有甜椒都剩低！","lang":"zh","zh_auto":true},
+  {"group":"基本動詞","fr":"mettre","article":"","gender":"","zh":"放、戴上","ja":"置く、つける、着る","ex_fr":"Attends, je mets mes lunettes.","ex_zh":"等陣，我戴返副眼鏡。","lang":"zh","zh_auto":true},
+  {"group":"基本動詞","fr":"prendre","article":"","gender":"","zh":"拿、乘搭","ja":"手に取る、乗る","ex_fr":"Ils ont pris tous mes jouets !","ex_zh":"佢哋攞晒我啲玩具！","lang":"zh","zh_auto":true},
+  {"group":"感情・知覺","fr":"aimer","article":"","gender":"","zh":"喜歡、愛","ja":"愛する","ex_fr":"J'aime bien danser.","ex_zh":"我幾鍾意跳舞。","lang":"zh","zh_auto":true},
+  {"group":"感情・知覺","fr":"adorer","article":"","gender":"","zh":"非常喜歡","ja":"大好きである","ex_fr":"Elle adore la mousse au chocolat.","ex_zh":"佢好鍾意朱古力慕絲。","lang":"zh","zh_auto":true},
+  {"group":"感情・知覺","fr":"préférer","article":"","gender":"","zh":"比較喜歡","ja":"より好む","ex_fr":"Tu préfères ton papa ou ta maman ?","ex_zh":"你比較鍾意爸爸定媽媽？","lang":"zh","zh_auto":true},
+  {"group":"感情・知覺","fr":"plaire","article":"","gender":"","zh":"討人喜歡、合心意","ja":"気に入る","ex_fr":"Ce tableau me plaît vraiment.","ex_zh":"我真係好鍾意呢幅畫。","lang":"zh","zh_auto":true},
+  {"group":"感情・知覺","fr":"rire","article":"","gender":"","zh":"笑","ja":"笑う","ex_fr":"On a ri tous ensemble.","ex_zh":"我哋大家一齊笑。","lang":"zh","zh_auto":true},
+  {"group":"感情・知覺","fr":"pleurer","article":"","gender":"","zh":"哭","ja":"泣く","ex_fr":"Pourquoi est-ce qu'il pleure ?","ex_zh":"點解佢喊緊？","lang":"zh","zh_auto":true},
+  {"group":"感情・知覺","fr":"regarder","article":"","gender":"","zh":"看","ja":"見る","ex_fr":"Elle me regarde depuis tout à l'heure.","ex_zh":"佢由頭先開始一直望住我。","lang":"zh","zh_auto":true},
+  {"group":"感情・知覺","fr":"voir","article":"","gender":"","zh":"看見、明白","ja":"見える、わかる","ex_fr":"On ne voit rien du tout.","ex_zh":"完全睇唔到任何嘢。","lang":"zh","zh_auto":true},
+  {"group":"感情・知覺","fr":"écouter","article":"","gender":"","zh":"聆聽","ja":"聞く","ex_fr":"Comme d'habitude, tu ne m'écoutes pas.","ex_zh":"你同平時一樣唔聽我講嘢。","lang":"zh","zh_auto":true},
+  {"group":"感情・知覺","fr":"entendre","article":"","gender":"","zh":"聽見","ja":"聞こえる","ex_fr":"Je vous entends mal.","ex_zh":"我聽唔清楚你講嘢。","lang":"zh","zh_auto":true},
+  {"group":"感情・知覺","fr":"sentir","article":"","gender":"","zh":"感覺到、聞到","ja":"感じる、においがする","ex_fr":"Ça sent bon !","ex_zh":"好香呀！","lang":"zh","zh_auto":true},
+  {"group":"感情・知覺","fr":"toucher","article":"","gender":"","zh":"觸摸","ja":"触る","ex_fr":"Sa main a touché mes cheveux.","ex_zh":"佢隻手掂到我啲頭髮。","lang":"zh","zh_auto":true},
+  {"group":"移動・動作","fr":"arriver","article":"","gender":"","zh":"到達","ja":"着く、起こる","ex_fr":"Nous allons bientôt arriver à l'aéroport Charles-de-Gaulle.","ex_zh":"我哋就快到達戴高樂機場。","lang":"zh","zh_auto":true},
+  {"group":"移動・動作","fr":"entrer","article":"","gender":"","zh":"進入","ja":"入る","ex_fr":"Je peux entrer ?","ex_zh":"我可以入嚟嗎？","lang":"zh","zh_auto":true},
+  {"group":"移動・動作","fr":"rentrer","article":"","gender":"","zh":"回去、回家","ja":"帰る","ex_fr":"Viens, on rentre chez nous.","ex_zh":"嚟啦，我哋返屋企。","lang":"zh","zh_auto":true},
+  {"group":"移動・動作","fr":"sortir","article":"","gender":"","zh":"出去","ja":"外へ出る","ex_fr":"Elle est sortie avec des amis.","ex_zh":"佢同朋友出咗去。","lang":"zh","zh_auto":true},
+  {"group":"移動・動作","fr":"partir","article":"","gender":"","zh":"出發、離開","ja":"出発する","ex_fr":"Il part faire des études à Londres.","ex_zh":"佢出發去倫敦讀書。","lang":"zh","zh_auto":true},
+  {"group":"移動・動作","fr":"passer","article":"","gender":"","zh":"經過、度過","ja":"通る、移る","ex_fr":"Le temps passe vite !","ex_zh":"時間過得真快！","lang":"zh","zh_auto":true},
+  {"group":"移動・動作","fr":"naître","article":"","gender":"","zh":"出生","ja":"生まれる","ex_fr":"Je suis né à Saitama, au Japon.","ex_zh":"我喺日本埼玉出生。","lang":"zh","zh_auto":true},
+  {"group":"移動・動作","fr":"mourir","article":"","gender":"","zh":"死亡","ja":"死ぬ","ex_fr":"Napoléon est mort en 1821.","ex_zh":"拿破崙喺1821年去世。","lang":"zh","zh_auto":true},
+  {"group":"移動・動作","fr":"tomber","article":"","gender":"","zh":"跌倒、掉落","ja":"倒れる、落ちる、転ぶ","ex_fr":"Il est tombé dans les escaliers.","ex_zh":"佢喺樓梯跌倒。","lang":"zh","zh_auto":true},
+  {"group":"移動・動作","fr":"monter","article":"","gender":"","zh":"上去、乘上","ja":"登る、乗る","ex_fr":"Elle est montée dans un taxi.","ex_zh":"佢上咗的士。","lang":"zh","zh_auto":true},
+  {"group":"移動・動作","fr":"descendre","article":"","gender":"","zh":"落去、下降","ja":"降りる","ex_fr":"On descend à la prochaine station.","ex_zh":"我哋下一個站落車。","lang":"zh","zh_auto":true},
+  {"group":"移動・動作","fr":"retourner","article":"","gender":"","zh":"返回","ja":"戻る","ex_fr":"Je veux retourner dans mon pays.","ex_zh":"我想返自己國家。","lang":"zh","zh_auto":true},
+  {"group":"移動・動作","fr":"rester","article":"","gender":"","zh":"留下、停留","ja":"とどまる","ex_fr":"Je suis resté chez moi.","ex_zh":"我留咗喺屋企。","lang":"zh","zh_auto":true},
+  {"group":"移動・動作","fr":"devenir","article":"","gender":"","zh":"變成","ja":"…になる","ex_fr":"Elle est devenue célèbre.","ex_zh":"佢成咗名人。","lang":"zh","zh_auto":true},
+  {"group":"移動・動作","fr":"visiter","article":"","gender":"","zh":"參觀、探訪","ja":"訪れる","ex_fr":"On peut visiter ce monument ?","ex_zh":"我哋可以參觀呢座紀念建築嗎？","lang":"zh","zh_auto":true},
+  {"group":"移動・動作","fr":"suivre","article":"","gender":"","zh":"跟隨","ja":"後について行く","ex_fr":"Ce chien me suit partout !","ex_zh":"隻狗周圍跟住我！","lang":"zh","zh_auto":true},
+  {"group":"移動・動作","fr":"quitter","article":"","gender":"","zh":"離開","ja":"離れる","ex_fr":"Il a quitté le travail à vingt heures.","ex_zh":"佢夜晚八點離開工作崗位。","lang":"zh","zh_auto":true},
+  {"group":"移動・動作","fr":"tourner","article":"","gender":"","zh":"轉彎、轉動","ja":"回る","ex_fr":"J'ai la tête qui tourne.","ex_zh":"我頭暈。","lang":"zh","zh_auto":true},
+  {"group":"移動・動作","fr":"courir","article":"","gender":"","zh":"跑","ja":"走る","ex_fr":"Ils courent vraiment vite !","ex_zh":"佢哋跑得真係好快！","lang":"zh","zh_auto":true},
+  {"group":"移動・動作","fr":"marcher","article":"","gender":"","zh":"走路","ja":"歩く、作動する","ex_fr":"Tu marches sur mon pied, là.","ex_zh":"你踩住我隻腳呀。","lang":"zh","zh_auto":true},
+  {"group":"移動・動作","fr":"voyager","article":"","gender":"","zh":"旅行","ja":"旅行する","ex_fr":"Nous voyageons souvent ensemble.","ex_zh":"我哋經常一齊旅行。","lang":"zh","zh_auto":true},
+  {"group":"移動・動作","fr":"conduire","article":"","gender":"","zh":"駕駛","ja":"運転する","ex_fr":"Il conduit mal.","ex_zh":"佢揸車揸得唔好。","lang":"zh","zh_auto":true},
+  {"group":"移動・動作","fr":"gagner","article":"","gender":"","zh":"贏、賺取","ja":"稼ぐ、勝つ","ex_fr":"On a gagné !","ex_zh":"我哋贏咗！","lang":"zh","zh_auto":true},
+  {"group":"移動・動作","fr":"perdre","article":"","gender":"","zh":"失去、輸","ja":"なくす、負ける","ex_fr":"J'ai perdu mon smartphone.","ex_zh":"我唔見咗部智能電話。","lang":"zh","zh_auto":true},
+  {"group":"思考・判斷","fr":"savoir","article":"","gender":"","zh":"知道","ja":"知っている","ex_fr":"Tu sais nager ?","ex_zh":"你識游水嗎？","lang":"zh","zh_auto":true},
+  {"group":"思考・判斷","fr":"connaître","article":"","gender":"","zh":"認識、知道","ja":"知っている","ex_fr":"Vous connaissez cette actrice ?","ex_zh":"你認識呢位女演員嗎？","lang":"zh","zh_auto":true},
+  {"group":"思考・判斷","fr":"croire","article":"","gender":"","zh":"相信","ja":"信じる、考える","ex_fr":"Je crois en toi.","ex_zh":"我相信你。","lang":"zh","zh_auto":true},
+  {"group":"思考・判斷","fr":"penser","article":"","gender":"","zh":"思考、認為","ja":"考える","ex_fr":"Tu penses à quoi ?","ex_zh":"你喺度諗緊乜？","lang":"zh","zh_auto":true},
+  {"group":"思考・判斷","fr":"trouver","article":"","gender":"","zh":"找到、覺得","ja":"見つける、…と思う","ex_fr":"Vous avez trouvé mon chien ?","ex_zh":"你搵到我隻狗嗎？","lang":"zh","zh_auto":true},
+  {"group":"思考・判斷","fr":"sembler","article":"","gender":"","zh":"似乎","ja":"…であるように思われる","ex_fr":"Il me semble qu'elle a raison.","ex_zh":"我覺得佢講得啱。","lang":"zh","zh_auto":true},
+  {"group":"思考・判斷","fr":"douter","article":"","gender":"","zh":"懷疑","ja":"疑う","ex_fr":"Je doute de sa parole.","ex_zh":"我懷疑佢講嘅話。","lang":"zh","zh_auto":true},
+  {"group":"思考・判斷","fr":"hésiter","article":"","gender":"","zh":"猶豫","ja":"ためらう","ex_fr":"J'hésite à lui dire la vérité.","ex_zh":"我猶豫緊應唔應該同佢講真相。","lang":"zh","zh_auto":true},
+  {"group":"思考・判斷","fr":"décider","article":"","gender":"","zh":"決定","ja":"決める","ex_fr":"Elle a décidé d'arrêter ce travail.","ex_zh":"佢決定辭咗呢份工。","lang":"zh","zh_auto":true},
+  {"group":"思考・判斷","fr":"excuser","article":"","gender":"","zh":"原諒","ja":"許す","ex_fr":"Excusez-moi pour le retard.","ex_zh":"對唔住，我遲到。","lang":"zh","zh_auto":true},
+  {"group":"日常動作","fr":"ouvrir","article":"","gender":"","zh":"打開","ja":"開ける","ex_fr":"La poste ouvre à quelle heure ?","ex_zh":"郵局幾點開門？","lang":"zh","zh_auto":true},
+  {"group":"日常動作","fr":"fermer","article":"","gender":"","zh":"關閉","ja":"閉める","ex_fr":"Tu peux fermer la fenêtre ?","ex_zh":"你可以閂窗嗎？","lang":"zh","zh_auto":true},
+  {"group":"日常動作","fr":"se reposer","article":"","gender":"","zh":"休息","ja":"休息する","ex_fr":"J'ai besoin de me reposer un peu.","ex_zh":"我需要休息一陣。","lang":"zh","zh_auto":true},
+  {"group":"日常動作","fr":"s'asseoir","article":"","gender":"","zh":"坐下","ja":"座る","ex_fr":"Asseyez-vous, je vous en prie.","ex_zh":"請坐。","lang":"zh","zh_auto":true},
+  {"group":"日常動作","fr":"se coucher","article":"","gender":"","zh":"上床睡覺","ja":"寝る","ex_fr":"Tu t'es couché tard, hier soir ?","ex_zh":"你尋晚好夜先瞓？","lang":"zh","zh_auto":true},
+  {"group":"日常動作","fr":"dormir","article":"","gender":"","zh":"睡覺","ja":"眠る","ex_fr":"Je n'arrive pas à dormir.","ex_zh":"我瞓唔着。","lang":"zh","zh_auto":true},
+  {"group":"日常動作","fr":"se réveiller","article":"","gender":"","zh":"醒來","ja":"目が覚める","ex_fr":"Je me suis réveillé en pleine nuit.","ex_zh":"我半夜醒咗。","lang":"zh","zh_auto":true},
+  {"group":"日常動作","fr":"se lever","article":"","gender":"","zh":"起床","ja":"起き上がる","ex_fr":"Il vient de se lever.","ex_zh":"佢啱啱起身。","lang":"zh","zh_auto":true},
+  {"group":"日常動作","fr":"habiter","article":"","gender":"","zh":"居住","ja":"住む","ex_fr":"Vous habitez seul ?","ex_zh":"你一個人住嗎？","lang":"zh","zh_auto":true},
+  {"group":"日常動作","fr":"vivre","article":"","gender":"","zh":"生活","ja":"生きる","ex_fr":"Nous vivons en harmonie avec la nature.","ex_zh":"我哋同大自然和諧共處。","lang":"zh","zh_auto":true},
+  {"group":"日常動作","fr":"danser","article":"","gender":"","zh":"跳舞","ja":"踊る","ex_fr":"Elles dansent bien la salsa.","ex_zh":"佢哋莎莎舞跳得好好。","lang":"zh","zh_auto":true},
+  {"group":"日常動作","fr":"chanter","article":"","gender":"","zh":"唱歌","ja":"歌う","ex_fr":"Les joueurs chantent la Marseillaise.","ex_zh":"啲球員唱緊《馬賽曲》。","lang":"zh","zh_auto":true},
+  {"group":"日常動作","fr":"jouer","article":"","gender":"","zh":"玩、演奏","ja":"遊ぶ、演奏する、演技する","ex_fr":"Il joue de la batterie.","ex_zh":"佢打鼓。","lang":"zh","zh_auto":true},
+  {"group":"日常動作","fr":"amuser","article":"","gender":"","zh":"使開心","ja":"楽しませる","ex_fr":"On s'est bien amusés.","ex_zh":"我哋玩得好開心。","lang":"zh","zh_auto":true},
+  {"group":"溝通","fr":"lire","article":"","gender":"","zh":"閱讀","ja":"読む","ex_fr":"Tu as lu ce roman ?","ex_zh":"你讀過呢本小說嗎？","lang":"zh","zh_auto":true},
+  {"group":"溝通","fr":"écrire","article":"","gender":"","zh":"寫","ja":"書く","ex_fr":"Il a écrit cette histoire en trois jours.","ex_zh":"佢用三日寫咗呢個故事。","lang":"zh","zh_auto":true},
+  {"group":"溝通","fr":"parler","article":"","gender":"","zh":"說話","ja":"話す","ex_fr":"Elle parle bien espagnol.","ex_zh":"佢西班牙文講得好好。","lang":"zh","zh_auto":true},
+  {"group":"溝通","fr":"dire","article":"","gender":"","zh":"說","ja":"言う","ex_fr":"Qu'est-ce qu'il a dit ?","ex_zh":"佢講咗乜？","lang":"zh","zh_auto":true},
+  {"group":"溝通","fr":"appeler","article":"","gender":"","zh":"叫、打電話","ja":"呼ぶ、電話する","ex_fr":"Vous pouvez appeler un taxi ?","ex_zh":"你可以幫我叫架的士嗎？","lang":"zh","zh_auto":true},
+  {"group":"溝通","fr":"téléphoner","article":"","gender":"","zh":"打電話","ja":"電話する","ex_fr":"Je téléphone à mes parents.","ex_zh":"我打電話畀父母。","lang":"zh","zh_auto":true},
+  {"group":"溝通","fr":"expliquer","article":"","gender":"","zh":"解釋","ja":"説明する","ex_fr":"Tu peux m'expliquer ce que tu fais là ?","ex_zh":"你可以解釋吓你喺度做乜嗎？","lang":"zh","zh_auto":true},
+  {"group":"溝通","fr":"se taire","article":"","gender":"","zh":"保持沉默","ja":"黙る","ex_fr":"Taisez-vous, on n'entend rien !","ex_zh":"靜啲！我哋乜都聽唔到！","lang":"zh","zh_auto":true},
+  {"group":"生活・動作","fr":"se laver","article":"","gender":"","zh":"洗澡、洗","ja":"洗う","ex_fr":"Lave-toi les mains avant de manger.","ex_zh":"食飯前洗手。","lang":"zh","zh_auto":true},
+  {"group":"生活・動作","fr":"nettoyer","article":"","gender":"","zh":"清潔","ja":"掃除する","ex_fr":"Il faut nettoyer la maison.","ex_zh":"要清潔間屋。","lang":"zh","zh_auto":true},
+  {"group":"生活・動作","fr":"ranger","article":"","gender":"","zh":"整理","ja":"片づける","ex_fr":"Je range ma chambre.","ex_zh":"我整理房間。","lang":"zh","zh_auto":true},
+  {"group":"生活・動作","fr":"changer","article":"","gender":"","zh":"改變、更換","ja":"変える","ex_fr":"Il a changé de coiffure.","ex_zh":"佢換咗髮型。","lang":"zh","zh_auto":true},
+  {"group":"生活・動作","fr":"élever","article":"","gender":"","zh":"養育、飼養","ja":"上げる、育てる","ex_fr":"Elle élève seule ses enfants.","ex_zh":"佢獨力養大啲仔女。","lang":"zh","zh_auto":true},
+  {"group":"生活・動作","fr":"soigner","article":"","gender":"","zh":"照顧、治療","ja":"世話をする、治す","ex_fr":"Comment tu as soigné ton mal de gorge ?","ex_zh":"你點樣醫好喉嚨痛？","lang":"zh","zh_auto":true},
+  {"group":"生活・動作","fr":"garder","article":"","gender":"","zh":"保管、保存","ja":"見張る、保管する","ex_fr":"J'ai gardé tous mes vieux cahiers.","ex_zh":"我保留咗所有舊筆記簿。","lang":"zh","zh_auto":true},
+  {"group":"生活・動作","fr":"couper","article":"","gender":"","zh":"切","ja":"切る","ex_fr":"Tu peux couper les légumes ?","ex_zh":"你可以切啲蔬菜嗎？","lang":"zh","zh_auto":true},
+  {"group":"生活・動作","fr":"servir","article":"","gender":"","zh":"端上、提供","ja":"（食事や飲物を）出す","ex_fr":"Il nous a servi un plat froid.","ex_zh":"佢端咗一道凍菜畀我哋。","lang":"zh","zh_auto":true},
+  {"group":"生活・動作","fr":"aider","article":"","gender":"","zh":"幫助","ja":"手伝う","ex_fr":"Je peux vous aider ?","ex_zh":"有咩可以幫到你？","lang":"zh","zh_auto":true},
+  {"group":"動作・狀態","fr":"commencer","article":"","gender":"","zh":"開始","ja":"始める","ex_fr":"Il commence à m'énerver.","ex_zh":"佢開始令我煩躁。","lang":"zh","zh_auto":true},
+  {"group":"動作・狀態","fr":"durer","article":"","gender":"","zh":"持續","ja":"続く","ex_fr":"Ce film dure combien de temps ?","ex_zh":"呢套電影有幾長？","lang":"zh","zh_auto":true},
+  {"group":"動作・狀態","fr":"continuer","article":"","gender":"","zh":"繼續","ja":"続ける","ex_fr":"Il a continué à parler.","ex_zh":"佢繼續講嘢。","lang":"zh","zh_auto":true},
+  {"group":"動作・狀態","fr":"finir","article":"","gender":"","zh":"結束","ja":"終える","ex_fr":"Tu as fini de manger ?","ex_zh":"你食完未？","lang":"zh","zh_auto":true},
+  {"group":"動作・狀態","fr":"cesser","article":"","gender":"","zh":"停止","ja":"中断する","ex_fr":"Je n'ai pas cessé de penser à toi.","ex_zh":"我一直都掛住你。","lang":"zh","zh_auto":true},
+  {"group":"動作・狀態","fr":"arrêter","article":"","gender":"","zh":"停止","ja":"止める、やめる","ex_fr":"Il a arrêté de me draguer.","ex_zh":"佢唔再撩我。","lang":"zh","zh_auto":true},
+  {"group":"人的動作","fr":"acheter","article":"","gender":"","zh":"買","ja":"買う","ex_fr":"Il a acheté un nouveau vélo.","ex_zh":"佢買咗架新單車。","lang":"zh","zh_auto":true,"ex_ja":"彼は新しい自転車を買った"},
+  {"group":"人的動作","fr":"vendre","article":"","gender":"","zh":"賣","ja":"売る","ex_fr":"J’ai vendu mon appartement.","ex_zh":"我賣咗自己層樓。","lang":"zh","zh_auto":true,"ex_ja":"私は自分のマンションを売った"},
+  {"group":"人的動作","fr":"donner","article":"","gender":"","zh":"給予","ja":"与える","ex_fr":"Il m’a donné cette montre.","ex_zh":"呢隻手錶係佢送畀我嘅。","lang":"zh","zh_auto":true,"ex_ja":"彼が私にこの時計をくれた"},
+  {"group":"人的動作","fr":"chercher","article":"","gender":"","zh":"尋找","ja":"探す","ex_fr":"Je cherche du travail.","ex_zh":"我搵緊工。","lang":"zh","zh_auto":true,"ex_ja":"仕事を探している"},
+  {"group":"人的動作","fr":"choisir","article":"","gender":"","zh":"選擇","ja":"選ぶ","ex_fr":"Pourquoi tu as choisi ce métier ?","ex_zh":"你點解揀呢個職業？","lang":"zh","zh_auto":true,"ex_ja":"なぜこの職業を選んだの？"},
+  {"group":"人的動作","fr":"coûter","article":"","gender":"","zh":"價錢是","ja":"値段が…である","ex_fr":"Combien ça coûte ?","ex_zh":"要幾多錢？","lang":"zh","zh_auto":true,"ex_ja":"いくらかかる？"},
+  {"group":"人的動作","fr":"demander","article":"","gender":"","zh":"詢問、請求","ja":"頼む、尋ねる","ex_fr":"Je peux vous demander quelque chose ?","ex_zh":"可以請你幫個忙嗎？","lang":"zh","zh_auto":true,"ex_ja":"ちょっとお願いしてもよろしいですか？"},
+  {"group":"人的動作","fr":"frapper","article":"","gender":"","zh":"敲","ja":"叩く","ex_fr":"Quelqu’un a frappé à la porte.","ex_zh":"有人敲咗門。","lang":"zh","zh_auto":true,"ex_ja":"誰かが扉を叩いた"},
+  {"group":"人的動作","fr":"pousser","article":"","gender":"","zh":"推","ja":"押す","ex_fr":"Ils ont poussé la voiture sous la neige.","ex_zh":"佢哋推咗架埋喺雪入面嘅車。","lang":"zh","zh_auto":true,"ex_ja":"彼らは雪に埋もれた車を押した"},
+  {"group":"人的動作","fr":"jeter","article":"","gender":"","zh":"扔掉","ja":"投げる、捨てる","ex_fr":"Tu peux aller jeter cette bouteille ?","ex_zh":"你可唔可以幫手拎呢個樽去掉？","lang":"zh","zh_auto":true,"ex_ja":"このびんを捨ててきてくれる？"},
+  {"group":"人的動作","fr":"poser","article":"","gender":"","zh":"放置","ja":"置く","ex_fr":"Il a posé le paquet sur la table.","ex_zh":"佢將個盒放咗喺枱上。","lang":"zh","zh_auto":true,"ex_ja":"彼はその箱を机に置いた"},
+  {"group":"人的動作","fr":"porter","article":"","gender":"","zh":"拿著、戴著","ja":"持つ、着ている","ex_fr":"Elle porte un chapeau assez original.","ex_zh":"佢戴住頂幾特別嘅帽。","lang":"zh","zh_auto":true,"ex_ja":"彼女は一風変わった帽子を被っている"},
+  {"group":"人的動作","fr":"saisir","article":"","gender":"","zh":"抓住","ja":"つかむ","ex_fr":"Il faut saisir sa chance.","ex_zh":"一定要把握機會。","lang":"zh","zh_auto":true,"ex_ja":"チャンスはつかまなければならない"},
+  {"group":"人的動作","fr":"tenir","article":"","gender":"","zh":"拿著","ja":"握っている、保つ","ex_fr":"Qu’est-ce qu’il tient dans sa main ?","ex_zh":"佢手裏面揸住咩？","lang":"zh","zh_auto":true,"ex_ja":"彼は手の中に何を持っているの？"},
+  {"group":"人的動作","fr":"tuer","article":"","gender":"","zh":"殺死","ja":"殺す","ex_fr":"La chaleur tue les bactéries.","ex_zh":"高溫會殺死細菌。","lang":"zh","zh_auto":true,"ex_ja":"熱が細菌を殺す"},
+  {"group":"飲食","fr":"boire","article":"","gender":"","zh":"飲","ja":"飲む","ex_fr":"Il a bu son verre d’un trait.","ex_zh":"佢一啖飲晒杯入面嘅嘢。","lang":"zh","zh_auto":true,"ex_ja":"彼は一気にグラスを飲み干した"},
+  {"group":"飲食","fr":"manger","article":"","gender":"","zh":"食","ja":"食べる","ex_fr":"Je mange de tout.","ex_zh":"我咩都食。","lang":"zh","zh_auto":true,"ex_ja":"私は何でも食べます"},
+  {"group":"飲食","fr":"fumer","article":"","gender":"","zh":"吸煙","ja":"たばこを吸う","ex_fr":"Elle ne fume plus.","ex_zh":"佢已經冇再食煙。","lang":"zh","zh_auto":true,"ex_ja":"彼女はたばこを吸わなくなった"},
+  {"group":"學習","fr":"travailler","article":"","gender":"","zh":"工作","ja":"働く、勉強する","ex_fr":"Tu travailles trop.","ex_zh":"你做嘢做得太多喇。","lang":"zh","zh_auto":true,"ex_ja":"君は働きすぎだよ"},
+  {"group":"學習","fr":"étudier","article":"","gender":"","zh":"學習","ja":"勉強する、検討する","ex_fr":"Nous allons étudier votre demande.","ex_zh":"我哋會審視你嘅申請。","lang":"zh","zh_auto":true,"ex_ja":"あなたの申請について検討いたします"},
+  {"group":"學習","fr":"apprendre","article":"","gender":"","zh":"學習、教導","ja":"学ぶ、教える","ex_fr":"J’ai appris beaucoup de choses avec toi.","ex_zh":"同你一齊，我學到好多嘢。","lang":"zh","zh_auto":true,"ex_ja":"君と一緒にたくさんのことを学びました"},
+  {"group":"學習","fr":"comprendre","article":"","gender":"","zh":"理解","ja":"理解する","ex_fr":"Je ne comprends pas ce qu’il dit.","ex_zh":"我唔明佢講緊咩。","lang":"zh","zh_auto":true,"ex_ja":"彼が言っていることはわかりません"},
+  {"group":"學習","fr":"enseigner","article":"","gender":"","zh":"教授","ja":"教える","ex_fr":"Elle enseigne l’histoire du Japon à l’université.","ex_zh":"佢喺大學教日本史。","lang":"zh","zh_auto":true,"ex_ja":"彼女は日本史を大学で教えている"},
+  {"group":"學習","fr":"oublier","article":"","gender":"","zh":"忘記","ja":"忘れる","ex_fr":"Ils ont oublié mon anniversaire !","ex_zh":"佢哋唔記得咗我生日呀！","lang":"zh","zh_auto":true,"ex_ja":"彼らは私の誕生日を忘れたの！"},
+  {"group":"事物的特徵","fr":"nouveau, nouvelle","article":"","gender":"mf","zh":"新的","ja":"新しい","ex_fr":"Ce groupe a sorti un nouvel album.","ex_zh":"呢隊組合出咗張新專輯。","lang":"zh","zh_auto":true,"ex_ja":"このグループは新しいアルバムを出した"},
+  {"group":"事物的特徵","fr":"vieux, vieille","article":"","gender":"mf","zh":"舊的、年老的","ja":"古い、高齢の","ex_fr":"C’est un vieux livre.","ex_zh":"呢本係舊書。","lang":"zh","zh_auto":true,"ex_ja":"これは古い本だ"},
+  {"group":"事物的特徵","fr":"ancien, ancienne","article":"","gender":"mf","zh":"以前的、舊的","ja":"昔の、元の","ex_fr":"C’est mon ancienne adresse.","ex_zh":"呢個係我以前嘅地址。","lang":"zh","zh_auto":true,"ex_ja":"これは前の住所です"},
+  {"group":"事物的特徵","fr":"chaud, chaude","article":"","gender":"mf","zh":"熱的","ja":"熱い、暑い","ex_fr":"Il fait chaud aujourd’hui !","ex_zh":"今日真係熱呀！","lang":"zh","zh_auto":true,"ex_ja":"今日は暑いな！"},
+  {"group":"事物的特徵","fr":"froid, froide","article":"","gender":"mf","zh":"冷的","ja":"冷たい、寒い","ex_fr":"Tu n’as pas froid, en t-shirt ?","ex_zh":"你着件T恤唔凍咩？","lang":"zh","zh_auto":true,"ex_ja":"Tシャツで寒くないの？"},
+  {"group":"事物的特徵","fr":"frais, fraîche","article":"","gender":"mf","zh":"清涼的、新鮮的","ja":"涼しい、冷たい、新鮮な","ex_fr":"Le champagne est bien frais.","ex_zh":"支香檳雪得好凍。","lang":"zh","zh_auto":true,"ex_ja":"シャンパンがよく冷えている"},
+  {"group":"事物的特徵","fr":"grand, grande","article":"","gender":"mf","zh":"大的","ja":"大きい","ex_fr":"Cette robe est trop grande pour moi.","ex_zh":"呢條裙我着太大喇。","lang":"zh","zh_auto":true,"ex_ja":"このドレスは私には大きすぎる"},
+  {"group":"事物的特徵","fr":"petit, petite","article":"","gender":"mf","zh":"小的","ja":"小さい","ex_fr":"Quand j’étais petit, j’étais assez timide.","ex_zh":"我細個嗰陣幾怕醜。","lang":"zh","zh_auto":true,"ex_ja":"小さかった頃、私は結構シャイでした"},
+  {"group":"事物的特徵","fr":"large","article":"","gender":"","zh":"闊的","ja":"幅の広い、大きい","ex_fr":"Ce rugbyman est très large d’épaules.","ex_zh":"呢個欖球員膊頭好橫。","lang":"zh","zh_auto":true,"ex_ja":"このラグビー選手は肩幅がとても広い"},
+  {"group":"事物的特徵","fr":"étroit, étroite","article":"","gender":"mf","zh":"狹窄的","ja":"狭い","ex_fr":"La rue est étroite.","ex_zh":"條街好窄。","lang":"zh","zh_auto":true,"ex_ja":"道が狭い"},
+  {"group":"事物的特徵","fr":"haut, haute","article":"","gender":"mf","zh":"高的","ja":"高い","ex_fr":"L’Everest est la plus haute montagne du monde.","ex_zh":"珠穆朗瑪峰係世界最高嘅山。","lang":"zh","zh_auto":true,"ex_ja":"エベレストは世界で最も高い山だ"},
+  {"group":"事物的特徵","fr":"bas, basse","article":"","gender":"mf","zh":"低的","ja":"低い","ex_fr":"Le prix du café est plus bas, ici.","ex_zh":"呢度嘅咖啡平啲。","lang":"zh","zh_auto":true,"ex_ja":"ここのコーヒーの値段はもっと安い"},
+  {"group":"人的感情・性格","fr":"heureux, heureuse","article":"","gender":"mf","zh":"幸福的","ja":"幸せな","ex_fr":"Avec toi, je me sens heureux.","ex_zh":"同你一齊，我覺得好幸福。","lang":"zh","zh_auto":true,"ex_ja":"君といると幸福を感じる"},
+  {"group":"人的感情・性格","fr":"malheureux, malheureuse","article":"","gender":"mf","zh":"不幸的","ja":"不幸な","ex_fr":"Il est toujours malheureux en amour.","ex_zh":"佢嘅感情生活總係唔順利。","lang":"zh","zh_auto":true,"ex_ja":"彼はいつも不幸な恋愛をする"},
+  {"group":"人的感情・性格","fr":"triste","article":"","gender":"","zh":"悲傷的","ja":"悲しい","ex_fr":"Ils sont tristes de devoir rentrer chez eux.","ex_zh":"佢哋因為要返屋企而覺得唔開心。","lang":"zh","zh_auto":true,"ex_ja":"家に帰らなければならないので彼らは悲しい"},
+  {"group":"人的感情・性格","fr":"cher, chère","article":"","gender":"mf","zh":"親愛的","ja":"愛しい","ex_fr":"Chère Alice,...","ex_zh":"親愛嘅愛麗絲，……","lang":"zh","zh_auto":true,"ex_ja":"アリスへ…"},
+  {"group":"人的感情・性格","fr":"charmant, charmante","article":"","gender":"mf","zh":"迷人的","ja":"魅力的な","ex_fr":"Cette femme est charmante.","ex_zh":"呢位女士好有魅力。","lang":"zh","zh_auto":true,"ex_ja":"この女性は魅力的だ"},
+  {"group":"人的感情・性格","fr":"aimable","article":"","gender":"","zh":"親切的","ja":"愛想のよい","ex_fr":"Il est aimable avec tout le monde.","ex_zh":"佢對個個都好親切。","lang":"zh","zh_auto":true,"ex_ja":"彼は誰に対しても愛想がいい"},
+  {"group":"人的感情・性格","fr":"sympathique","article":"","gender":"","zh":"討人喜歡的","ja":"感じのいい","ex_fr":"Elle est très sympa.","ex_zh":"佢為人好親切。","lang":"zh","zh_auto":true,"ex_ja":"彼女はとても感じがいい"},
+  {"group":"人的感情・性格","fr":"joyeux, joyeuse","article":"","gender":"mf","zh":"開心的","ja":"陽気な","ex_fr":"Joyeux anniversaire !","ex_zh":"生日快樂！","lang":"zh","zh_auto":true,"ex_ja":"お誕生日おめでとう！"},
+  {"group":"人的感情・性格","fr":"gentil, gentille","article":"","gender":"mf","zh":"親切的","ja":"親切な","ex_fr":"Ce garçon est gentil.","ex_zh":"呢個男仔好親切。","lang":"zh","zh_auto":true,"ex_ja":"この男の子は優しい"},
+  {"group":"人的感情・性格","fr":"honnête","article":"","gender":"","zh":"誠實的","ja":"正直な","ex_fr":"Il n’est pas honnête avec moi.","ex_zh":"佢對我唔坦白。","lang":"zh","zh_auto":true,"ex_ja":"彼は私に対して不誠実だ"},
+  {"group":"人的感情・性格","fr":"méchant, méchante","article":"","gender":"mf","zh":"壞心腸的","ja":"意地悪な","ex_fr":"Elles ont été méchantes avec leur cousine.","ex_zh":"佢哋對嗰位堂／表姊妹好刻薄。","lang":"zh","zh_auto":true,"ex_ja":"彼女たちはいとこに対して意地悪だった"},
+  {"group":"人的感情・性格","fr":"timide","article":"","gender":"","zh":"害羞的","ja":"内気な","ex_fr":"J’ai toujours été timide.","ex_zh":"我一直都好怕醜。","lang":"zh","zh_auto":true,"ex_ja":"私は昔からずっとシャイです"},
+  {"group":"人的感情・性格","fr":"bizarre","article":"","gender":"","zh":"奇怪的","ja":"変な","ex_fr":"Il est un peu bizarre, non ?","ex_zh":"你唔覺得佢有啲古怪咩？","lang":"zh","zh_auto":true,"ex_ja":"彼ってちょっと変じゃない？"},
+  {"group":"人的感情・性格","fr":"fou, folle","article":"","gender":"mf","zh":"瘋狂的","ja":"気の狂った","ex_fr":"Vous êtes fou de sortir sans manteau !","ex_zh":"你唔着褸就出街，真係癲㗎！","lang":"zh","zh_auto":true,"ex_ja":"コートを着ないで外出するなんてどうかしてますよ！"},
+  {"group":"人的感情・性格","fr":"bête","article":"","gender":"","zh":"愚蠢的","ja":"《話》ばかな","ex_fr":"Ce n’est pas bête, comme idée !","ex_zh":"呢個主意幾好喎！","lang":"zh","zh_auto":true,"ex_ja":"なかなか良い案だね！"},
+  {"group":"人的感情・性格","fr":"beau, belle","article":"","gender":"mf","zh":"美麗的","ja":"美しい","ex_fr":"Cette œuvre d’art est vraiment belle.","ex_zh":"呢件藝術品真係好靚。","lang":"zh","zh_auto":true,"ex_ja":"この芸術作品は本当に美しい"},
+  {"group":"人的感情・性格","fr":"prêt, prête","article":"","gender":"mf","zh":"準備好的","ja":"用意のできた","ex_fr":"C’est bon, vous êtes prêts à partir ?","ex_zh":"好喇，你哋準備好出發未？","lang":"zh","zh_auto":true,"ex_ja":"さあ、出発する準備はできましたか？"},
+  {"group":"人的感情・性格","fr":"surpris, surprise","article":"","gender":"mf","zh":"驚訝的","ja":"驚いた","ex_fr":"Il a l’air surpris.","ex_zh":"佢睇落好驚訝。","lang":"zh","zh_auto":true,"ex_ja":"彼は驚いているようだ"},
+  {"group":"人的感情・性格","fr":"célèbre","article":"","gender":"","zh":"有名的","ja":"有名な","ex_fr":"C’est un écrivain célèbre.","ex_zh":"佢係一位出名嘅作家。","lang":"zh","zh_auto":true,"ex_ja":"有名な作家だ"},
+  {"group":"人的感情・性格","fr":"riche","article":"","gender":"","zh":"富有的","ja":"裕福な、豊富な","ex_fr":"Ils viennent d’une famille très riche.","ex_zh":"佢哋出身自一個好富裕嘅家庭。","lang":"zh","zh_auto":true,"ex_ja":"彼らはとても裕福な家庭の出身だ"},
+  {"group":"人的感情・性格","fr":"pauvre","article":"","gender":"","zh":"貧窮的","ja":"貧しい、かわいそうな","ex_fr":"Ce repas est pauvre en calories.","ex_zh":"呢餐嘅熱量好低。","lang":"zh","zh_auto":true,"ex_ja":"この食事はカロリーが低い"},
+  {"group":"人的感情・性格","fr":"gros, grosse","article":"","gender":"mf","zh":"大的、肥的","ja":"太った、厚い","ex_fr":"Tu me trouves grosse ?","ex_zh":"你覺得我肥嗎？","lang":"zh","zh_auto":true,"ex_ja":"私のことを太っていると思う？"},
+  {"group":"人的感情・性格","fr":"mince","article":"","gender":"","zh":"瘦的","ja":"細い、薄い","ex_fr":"L’espoir est mince.","ex_zh":"希望好渺茫。","lang":"zh","zh_auto":true,"ex_ja":"望みは薄い"},
+  {"group":"人的感情・性格","fr":"maigre","article":"","gender":"","zh":"過瘦的","ja":"痩せた","ex_fr":"Ces mannequins sont trop maigres.","ex_zh":"呢幾位時裝模特兒太瘦喇。","lang":"zh","zh_auto":true,"ex_ja":"これらのファッションモデルたちは痩せすぎている"},
+  {"group":"性質・狀態","fr":"fort, forte","article":"","gender":"mf","zh":"強的","ja":"強い","ex_fr":"C’est fort, comme alcool !","ex_zh":"呢隻酒好烈呀！","lang":"zh","zh_auto":true,"ex_ja":"アルコールが強いな！"},
+  {"group":"性質・狀態","fr":"faible","article":"","gender":"","zh":"弱的","ja":"弱い","ex_fr":"Je me sens un peu faible.","ex_zh":"我覺得個人有啲冇力。","lang":"zh","zh_auto":true,"ex_ja":"体のだるさが少しあります"},
+  {"group":"性質・狀態","fr":"âgé, âgée","article":"","gender":"mf","zh":"年老的","ja":"高齢の","ex_fr":"De plus en plus de personnes âgées travaillent.","ex_zh":"愈嚟愈多長者返工。","lang":"zh","zh_auto":true,"ex_ja":"ますます多くの高齢者が働いています"},
+  {"group":"性質・狀態","fr":"jeune","article":"","gender":"","zh":"年輕的","ja":"若い","ex_fr":"Ce vin est un peu jeune.","ex_zh":"呢款葡萄酒仲未夠陳年。","lang":"zh","zh_auto":true,"ex_ja":"このワインは少し若い"},
+  {"group":"性質・狀態","fr":"joli, jolie","article":"","gender":"mf","zh":"漂亮的","ja":"きれいな","ex_fr":"Ces fleurs sont très jolies.","ex_zh":"呢啲花好靚。","lang":"zh","zh_auto":true,"ex_ja":"これらの花はとても美しい"},
+  {"group":"性質・狀態","fr":"blessé, blessée","article":"","gender":"mf","zh":"受傷的","ja":"負傷した","ex_fr":"Personne n’est blessé ?","ex_zh":"冇人受傷吖嘛？","lang":"zh","zh_auto":true,"ex_ja":"誰もケガしてない？"},
+  {"group":"性質・狀態","fr":"malade","article":"","gender":"","zh":"生病的","ja":"病気の","ex_fr":"Tu es malade ?","ex_zh":"你病咗呀？","lang":"zh","zh_auto":true,"ex_ja":"病気なの？"},
+  {"group":"性質・狀態","fr":"agréable","article":"","gender":"","zh":"愉快的","ja":"快い","ex_fr":"On a passé un week-end très agréable.","ex_zh":"我哋過咗一個好愉快嘅週末。","lang":"zh","zh_auto":true,"ex_ja":"私たちはとてもすてきな週末を過ごしました"},
+  {"group":"性質・狀態","fr":"doux, douce","article":"","gender":"mf","zh":"柔和的","ja":"甘い、穏やかな","ex_fr":"J’ai pris une bouteille de cidre doux.","ex_zh":"我叫咗一支甜味蘋果酒。","lang":"zh","zh_auto":true,"ex_ja":"甘口のシードルを１本注文しました"},
+  {"group":"性質・狀態","fr":"parfait, parfaite","article":"","gender":"mf","zh":"完美的","ja":"完璧な","ex_fr":"Merci pour le dîner : tout a été parfait !","ex_zh":"多謝你嘅晚餐，樣樣都好完美！","lang":"zh","zh_auto":true,"ex_ja":"夕食ありがとうございました。すべてが完璧でした！"},
+  {"group":"性質・狀態","fr":"possible","article":"","gender":"","zh":"可能的","ja":"可能な","ex_fr":"C’est possible de prendre des photos ?","ex_zh":"請問可唔可以影相？","lang":"zh","zh_auto":true,"ex_ja":"写真を撮ることは可能でしょうか？"},
+  {"group":"性質・狀態","fr":"impossible","article":"","gender":"","zh":"不可能的","ja":"不可能な","ex_fr":"Je regrette, c’est impossible.","ex_zh":"唔好意思，呢件事做唔到。","lang":"zh","zh_auto":true,"ex_ja":"申し訳ありませんが、それは無理です"},
+  {"group":"性質・狀態","fr":"facile","article":"","gender":"","zh":"容易的","ja":"簡単な","ex_fr":"C’est facile de critiquer.","ex_zh":"批評人好容易。","lang":"zh","zh_auto":true,"ex_ja":"批判するのは簡単だ"},
+  {"group":"性質・狀態","fr":"difficile","article":"","gender":"","zh":"困難的","ja":"難しい","ex_fr":"Ce jeu est difficile.","ex_zh":"呢個遊戲好難。","lang":"zh","zh_auto":true,"ex_ja":"このゲームは難しい"},
+  {"group":"性質・狀態","fr":"dur, dure","article":"","gender":"mf","zh":"硬的、難的","ja":"固い、難しい","ex_fr":"Le pain est trop dur.","ex_zh":"個麵包太硬喇。","lang":"zh","zh_auto":true,"ex_ja":"そのパンは固すぎる"},
+  {"group":"性質・狀態","fr":"bon, bonne","article":"","gender":"mf","zh":"好的","ja":"よい、おいしい","ex_fr":"Il a un bon salaire.","ex_zh":"佢份工人工幾好。","lang":"zh","zh_auto":true,"ex_ja":"彼はいい給料をもらっている"},
+  {"group":"性質・狀態","fr":"meilleur, meilleure","article":"","gender":"mf","zh":"更好的","ja":"よりよい","ex_fr":"Elle est meilleure que moi en anglais.","ex_zh":"佢英文好過我。","lang":"zh","zh_auto":true,"ex_ja":"彼女は私より英語ができる"},
+  {"group":"性質・狀態","fr":"bien","article":"","gender":"","zh":"好、非常","ja":"よく、非常に","ex_fr":"Je suis bien, avec toi.","ex_zh":"同你一齊，我覺得好安心。","lang":"zh","zh_auto":true,"ex_ja":"君といると、落ち着くよ"},
+  {"group":"性質・狀態","fr":"mieux","article":"","gender":"","zh":"更好","ja":"よりよく","ex_fr":"Ça va mieux ?","ex_zh":"你好返啲未？","lang":"zh","zh_auto":true,"ex_ja":"元気になった？"},
+  {"group":"性質・狀態","fr":"mauvais, mauvaise","article":"","gender":"mf","zh":"壞的","ja":"悪い","ex_fr":"Il a eu une mauvaise note.","ex_zh":"佢考得唔好。","lang":"zh","zh_auto":true,"ex_ja":"彼は悪い成績を取った"},
+  {"group":"性質・狀態","fr":"mal","article":"","gender":"","zh":"不好","ja":"悪く","ex_fr":"Je me sens un peu mal.","ex_zh":"我覺得有啲唔舒服。","lang":"zh","zh_auto":true,"ex_ja":"ちょっと体調が悪い"},
+  {"group":"性質・狀態","fr":"terrible","article":"","gender":"","zh":"可怕的","ja":"ひどい、すさまじい","ex_fr":"La tempête était terrible.","ex_zh":"嗰場風暴好猛烈。","lang":"zh","zh_auto":true,"ex_ja":"ひどい嵐だった"},
+  {"group":"性質・狀態","fr":"sûr, sûre","article":"","gender":"mf","zh":"確信的","ja":"確信した","ex_fr":"Vous êtes sûr de votre choix ?","ex_zh":"你真係肯定要咁揀？","lang":"zh","zh_auto":true,"ex_ja":"本当にそれでよろしいのですか？"},
+  {"group":"性質・狀態","fr":"intéressant, intéressante","article":"","gender":"mf","zh":"有趣的","ja":"興味深い","ex_fr":"C’est un film intéressant.","ex_zh":"呢套戲好有意思。","lang":"zh","zh_auto":true,"ex_ja":"これは面白い映画だよ"},
+  {"group":"性質・狀態","fr":"grave","article":"","gender":"","zh":"嚴重的","ja":"重大な","ex_fr":"La situation est grave.","ex_zh":"情況好嚴重。","lang":"zh","zh_auto":true,"ex_ja":"状況は深刻だ"},
+  {"group":"性質・狀態","fr":"faux, fausse","article":"","gender":"mf","zh":"錯誤的","ja":"間違った、偽の","ex_fr":"C’est un faux billet.","ex_zh":"呢張係假鈔。","lang":"zh","zh_auto":true,"ex_ja":"これは偽札だ"},
+  {"group":"性質・狀態","fr":"correct, correcte","article":"","gender":"mf","zh":"正確的","ja":"正しい","ex_fr":"Une tenue correcte est exigée.","ex_zh":"敬請穿着正式服裝出席。","lang":"zh","zh_auto":true,"ex_ja":"正装でお越しください"},
+  {"group":"性質・狀態","fr":"vrai, vraie","article":"","gender":"mf","zh":"真正的","ja":"本当の、真の","ex_fr":"Tu es un vrai ami pour moi.","ex_zh":"對我嚟講，你係真正嘅朋友。","lang":"zh","zh_auto":true,"ex_ja":"君は私にとって本当の友だちだよ"},
+  {"group":"性質・狀態","fr":"vraiment","article":"","gender":"","zh":"真的","ja":"本当に","ex_fr":"Je suis vraiment content pour toi.","ex_zh":"我真係戥你開心。","lang":"zh","zh_auto":true,"ex_ja":"本当によかったね"},
+  {"group":"性質・狀態","fr":"certain, certaine","article":"","gender":"mf","zh":"確實的","ja":"確実な、とある","ex_fr":"C’est sûr et certain.","ex_zh":"呢件事係肯定嘅。","lang":"zh","zh_auto":true,"ex_ja":"それは確実だ"},
+  {"group":"性質・狀態","fr":"certainement","article":"","gender":"","zh":"確實地","ja":"確実に、おそらく","ex_fr":"Je vais certainement déménager en janvier.","ex_zh":"我大概會喺一月搬屋。","lang":"zh","zh_auto":true,"ex_ja":"おそらく１月に引っ越すだろう"},
+  {"group":"性質・狀態","fr":"rare","article":"","gender":"","zh":"罕見的","ja":"珍しい","ex_fr":"On utilise des métaux rares pour les smartphones.","ex_zh":"智能手機用到稀有金屬。","lang":"zh","zh_auto":true,"ex_ja":"スマートフォンにはレアメタルが使われている"},
+  {"group":"性質・狀態","fr":"cher, chère","article":"","gender":"mf","zh":"昂貴的","ja":"高価な","ex_fr":"Cette montre est trop chère !","ex_zh":"呢隻手錶太貴喇！","lang":"zh","zh_auto":true,"ex_ja":"この時計は高すぎる！"},
+  {"group":"性質・狀態","fr":"amusant, amusante","article":"","gender":"mf","zh":"有趣的","ja":"楽しい","ex_fr":"Je vais vous raconter une anecdote amusante.","ex_zh":"我講件趣事畀你聽。","lang":"zh","zh_auto":true,"ex_ja":"面白い話をしてあげよう"},
+  {"group":"性質・狀態","fr":"égal, égale","article":"","gender":"mf","zh":"平等的","ja":"同等の、平等な","ex_fr":"Tous les hommes sont égaux.","ex_zh":"人人平等。","lang":"zh","zh_auto":true,"ex_ja":"人類みな平等だ"},
+  {"group":"性質・狀態","fr":"libre","article":"","gender":"","zh":"自由的","ja":"自由な","ex_fr":"« Entrée libre. »","ex_zh":"免費入場。","lang":"zh","zh_auto":true,"ex_ja":"入場無料"},
+  {"group":"時間・場所","fr":"plutôt","article":"","gender":"","zh":"寧願、比較","ja":"むしろ","ex_fr":"Je vais plutôt prendre un cappuccino.","ex_zh":"我都係要杯泡沫咖啡啦。","lang":"zh","zh_auto":true,"ex_ja":"それよりカプチーノにしようかな"},
+  {"group":"時間・場所","fr":"juste","article":"","gender":"","zh":"剛好","ja":"ただ…だけ","ex_fr":"C’est juste une amie !","ex_zh":"佢只係我朋友咋！","lang":"zh","zh_auto":true,"ex_ja":"ただの友だちだって！"},
+  {"group":"時間・場所","fr":"aujourd’hui","article":"","gender":"","zh":"今日","ja":"今日","ex_fr":"Nous sommes le combien, aujourd’hui ?","ex_zh":"今日幾多號？","lang":"zh","zh_auto":true,"ex_ja":"今日は何日ですか？"},
+  {"group":"時間・場所","fr":"demain","article":"","gender":"","zh":"明日","ja":"明日","ex_fr":"Demain, il va pleuvoir.","ex_zh":"聽日會落雨。","lang":"zh","zh_auto":true,"ex_ja":"明日は雨が降るでしょう"},
+  {"group":"時間・場所","fr":"hier","article":"","gender":"","zh":"昨日","ja":"昨日","ex_fr":"J’ai trop bu hier soir.","ex_zh":"我尋晚飲多咗。","lang":"zh","zh_auto":true,"ex_ja":"昨晩は飲みすぎた"},
+  {"group":"時間・場所","fr":"bientôt","article":"","gender":"","zh":"不久","ja":"間もなく","ex_fr":"Ce film sort bientôt en salle.","ex_zh":"呢套戲就快上映。","lang":"zh","zh_auto":true,"ex_ja":"この映画はまもなく封切られる"},
+  {"group":"時間・場所","fr":"longtemps","article":"","gender":"","zh":"長時間","ja":"長い間","ex_fr":"Elle est partie il y a longtemps ?","ex_zh":"佢係咪好耐之前就出發咗？","lang":"zh","zh_auto":true,"ex_ja":"彼女はずいぶん前に出発したの？"},
+  {"group":"時間・場所","fr":"maintenant","article":"","gender":"","zh":"現在","ja":"今","ex_fr":"Tu fais quoi comme travail, maintenant ?","ex_zh":"你而家做邊行？","lang":"zh","zh_auto":true,"ex_ja":"今は何の仕事しているの？"},
+  {"group":"時間・場所","fr":"prochain, prochaine","article":"","gender":"mf","zh":"下一個","ja":"この次の","ex_fr":"A la semaine prochaine !","ex_zh":"下個禮拜見！","lang":"zh","zh_auto":true,"ex_ja":"また来週！"},
+  {"group":"時間・場所","fr":"dernier, dernière","article":"","gender":"mf","zh":"上一個、最後的","ja":"最後の、この前の","ex_fr":"On s’est rencontrés l’année dernière.","ex_zh":"我哋舊年識嘅。","lang":"zh","zh_auto":true,"ex_ja":"私たちは去年出会いました"},
+  {"group":"時間・場所","fr":"tôt","article":"","gender":"","zh":"早","ja":"早く","ex_fr":"Je n’arrive pas à me lever tôt le matin.","ex_zh":"我朝早起唔到咁早。","lang":"zh","zh_auto":true,"ex_ja":"私は朝早く起きられない"},
+  {"group":"時間・場所","fr":"tard","article":"","gender":"","zh":"遲","ja":"遅く","ex_fr":"C’est trop tard, à présent.","ex_zh":"依家已經太遲喇。","lang":"zh","zh_auto":true,"ex_ja":"今となっては遅すぎる"},
+  {"group":"時間・場所","fr":"ici","article":"","gender":"","zh":"這裏","ja":"ここに","ex_fr":"« Vous êtes ici. »","ex_zh":"你嘅所在位置。","lang":"zh","zh_auto":true,"ex_ja":"現在地"},
+  {"group":"時間・場所","fr":"là","article":"","gender":"","zh":"那裏","ja":"そこ","ex_fr":"Tout le monde est là ?","ex_zh":"大家都到齊未？","lang":"zh","zh_auto":true,"ex_ja":"みんないますか？"},
+  {"group":"時間・場所","fr":"là-bas","article":"","gender":"","zh":"那邊","ja":"あそこに","ex_fr":"Pour la détaxe, c’est là-bas.","ex_zh":"辦退稅要去嗰邊。","lang":"zh","zh_auto":true,"ex_ja":"免税ならあそこですよ"},
+  {"group":"時間・場所","fr":"proche","article":"","gender":"","zh":"近的","ja":"近い","ex_fr":"L’aéroport est proche du centre-ville.","ex_zh":"機場好近市中心。","lang":"zh","zh_auto":true,"ex_ja":"空港は市街地の中心から近い"},
+  {"group":"時間・場所","fr":"près","article":"","gender":"","zh":"附近","ja":"近く","ex_fr":"J’habite près de Genève.","ex_zh":"我住喺日內瓦附近。","lang":"zh","zh_auto":true,"ex_ja":"ジュネーブの近くに住んでいます"},
+  {"group":"時間・場所","fr":"loin","article":"","gender":"","zh":"遠","ja":"遠く","ex_fr":"La station est loin d’ici ?","ex_zh":"個站離呢度遠唔遠？","lang":"zh","zh_auto":true,"ex_ja":"駅はここから遠いですか？"},
+  {"group":"時間・場所","fr":"dedans","article":"","gender":"","zh":"裏面","ja":"中に","ex_fr":"Qu’est-ce qu’il y a, dedans ?","ex_zh":"入面有啲咩？","lang":"zh","zh_auto":true,"ex_ja":"中に何がありますか？"},
+  {"group":"時間・場所","fr":"dehors","article":"","gender":"","zh":"外面","ja":"外に","ex_fr":"Ne restez pas dehors, avec ce froid !","ex_zh":"天氣咁凍，唔好留喺出面呀！","lang":"zh","zh_auto":true,"ex_ja":"この寒さの中、外に居続けないでください！"},
+  {"group":"時間・場所","fr":"ensuite","article":"","gender":"","zh":"然後","ja":"次に","ex_fr":"Et ensuite, qu’est-ce qu’il faut faire ?","ex_zh":"咁跟住要做咩？","lang":"zh","zh_auto":true,"ex_ja":"次は何をしなければならないの？"},
+  {"group":"時間・場所","fr":"puis","article":"","gender":"","zh":"然後","ja":"それから","ex_fr":"Nous sommes allés à Prague, puis à Amsterdam.","ex_zh":"我哋去咗布拉格，跟住去咗阿姆斯特丹。","lang":"zh","zh_auto":true,"ex_ja":"私たちはプラハ、それからアムステルダムに行きました"},
+  {"group":"時間・場所","fr":"enfin","article":"","gender":"","zh":"終於","ja":"ついに、結局","ex_fr":"On est enfin arrivé !","ex_zh":"我哋終於到喇！","lang":"zh","zh_auto":true,"ex_ja":"やっと着いた！"},
+  {"group":"時間・場所","fr":"ainsi","article":"","gender":"","zh":"如此","ja":"このように","ex_fr":"Pourquoi me regardez-vous ainsi ?","ex_zh":"你點解咁樣望住我？","lang":"zh","zh_auto":true,"ex_ja":"どうして私をそんな目で見るのですか？"}
+];
+</script>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>法文單詞卡</title>
+<style>
+:root{color-scheme:light;--ink:#262e43;--muted:#626978;--paper:#fffdf8;--line:#d9d8d0;--accent:#30477a;--blue:#244e9b;--red:#ad3348;font-family:"DM Sans","PingFang HK","Microsoft JhengHei",system-ui,sans-serif;color:var(--ink);background:#f3f1e9}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;background:linear-gradient(110deg,#f4f1e9,#f8f6f0 62%,#eeeee6)}
+main{max-width:870px;margin:auto;padding:clamp(20px,5vw,56px) clamp(16px,4vw,36px) 48px}
+header{border-top:3px solid var(--ink);padding:25px 0 23px;display:flex;align-items:center;justify-content:space-between;gap:10px;border-bottom:1px solid var(--line)}
+h1,h2,p{margin:0}
+h1{font-family:"Noto Serif TC","Songti TC","PMingLiU",serif;font-size:clamp(32px,5.5vw,51px);letter-spacing:.02em;line-height:1.25}
+.french-title{font-family:Baskervville,Georgia,serif;font-style:italic;font-size:19px;color:var(--muted);margin-bottom:6px}
+.deck-art{display:grid;place-items:center;width:76px;height:56px;margin-right:10px;transform:rotate(6deg);border:1px solid #aaa99b;border-radius:4px;background:repeating-linear-gradient(transparent 0 10px,#d5d9e0 10px 11px) var(--paper);box-shadow:-5px 4px 0 #c9cbb9,-8px 7px 0 #e1d1b6}
+.deck-art i{width:12px;height:20px;background:#a85649;align-self:start;justify-self:end;margin-right:10px;clip-path:polygon(0 0,100% 0,100% 100%,50% 76%,0 100%)}
+.section-head,.toolbar,.row,.study-head,.nav{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.section-head{margin:24px 0 12px}.section-title{font-size:20px}.muted,.preview,.hint{color:var(--muted)}.summary{font-size:14px;margin-top:4px}
+button,input{font:inherit}button{cursor:pointer;border:1px solid var(--line);border-radius:8px;color:var(--ink);background:var(--paper);min-height:44px;padding:8px 14px;font-weight:600}button:hover:enabled{border-color:var(--accent)}button:disabled{opacity:.45;cursor:default}
+:focus-visible{outline:3px solid #8174b5;outline-offset:3px}button,input,label{-webkit-tap-highlight-color:transparent}
+.tools{display:flex;gap:4px}.subtle{font-size:14px;background:transparent;border-color:transparent;padding:7px 10px;color:var(--accent)}
+.groups{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px}
+.group{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:12px;background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:15px;cursor:pointer;min-width:0}
+.group:has(input:checked){border-color:#b5bdc9}.group:hover{box-shadow:0 2px 8px #33394d13}
+.group input{width:18px;height:18px;accent-color:var(--accent);margin:0}.group b{font-size:16px}.preview{display:block;font:italic 15px/1.4 Baskervville,Georgia,serif;margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.group-copy{min-width:0}.count{font-size:14px;color:#525d70;font-variant-numeric:tabular-nums}
+.mode{display:flex;align-items:center;gap:14px;cursor:pointer;min-height:52px}.mode strong{display:block}.hint{font-size:13px;display:block;margin-top:3px}
+.switch{appearance:none;flex:none;width:43px;height:26px;border-radius:18px;background:#83858b;margin:0;position:relative;cursor:pointer}.switch:before{content:"";position:absolute;left:3px;top:3px;width:20px;height:20px;border-radius:50%;background:white}.switch:checked{background:var(--accent)}.switch:checked:before{transform:translateX(17px)}
+.settings{margin:16px 0;padding:6px 2px;border-block:1px solid var(--line)}
+.toolbar{margin-top:16px}.selection{font-weight:600}.primary{background:var(--accent);color:white;border-color:var(--accent);padding:11px 23px}.primary:hover:enabled{background:#22385f}
+.study-head{margin:16px 0 10px}.study-head .subtle{padding-inline:4px}.meter{height:4px;border-radius:4px;background:#dadcd9;overflow:hidden}.meter div{height:100%;background:var(--accent)}
+.flash{isolation:isolate;position:relative;background:var(--paper);border:1px solid #c9c8bd;border-radius:12px;margin:20px 0 16px;padding:clamp(18px,4vw,32px);min-height:clamp(310px,45vh,430px);box-shadow:0 4px 0 -1px #eeece2,0 5px 0 -1px #c9c8bd;display:flex;flex-direction:column;gap:18px}
+.card-tag,.side{font-size:13px;color:var(--muted)}.content{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;overflow-wrap:anywhere}
+.term{font:500 clamp(34px,6vw,57px)/1.13 Baskervville,Georgia,serif;letter-spacing:-.025em}.term span{display:inline-block}.separator{font-size:.62em;color:#979a9f;vertical-align:middle}.m{color:var(--blue)}.f{color:var(--red)}.meaning{font-size:clamp(25px,4.5vw,38px);font-weight:650;line-height:1.4}
+.gender,.ai{font-size:13px;color:var(--muted);font-weight:500}.ai{margin-inline-start:6px;white-space:nowrap}
+.sound{z-index:2;position:relative;background:#f4f3ed;border-radius:999px;min-width:44px;padding:7px;font-size:17px}.example{align-self:stretch;border-top:1px solid var(--line);margin-top:10px;padding-top:12px}.example p{font:normal 22px/1.45 Baskervville,Georgia,serif}.example small{display:block;font-size:15px;margin-top:5px;color:var(--muted)}.example .sound{margin-left:8px}
+.flip{position:absolute;inset:0;width:100%;height:100%;z-index:1;border:0;background:transparent;border-radius:inherit}.flip:hover:enabled{background:transparent}.flip-hint{text-align:center;color:var(--muted);font-size:13px}
+.nav{display:grid;grid-template-columns:1fr auto 1fr}.nav button:last-child{justify-self:stretch}.audio-status{min-height:1.5em;text-align:center;margin-top:12px;color:#8b3b35;font-size:14px}
+.home-actions,.dict-controls{display:flex;align-items:center;gap:10px}
+.voice-info{margin-top:15px;font-size:13px;color:var(--muted);overflow-wrap:anywhere}
+.dict-controls{flex-wrap:wrap;justify-content:space-between;margin:15px 0 8px}
+.search{flex:1 1 240px;min-width:0;font:inherit;font-size:16px;padding:12px 14px;border:1px solid #aeb4c0;border-radius:8px;background:var(--paper);color:var(--ink)}
+.dict-controls .mode{gap:9px}.dict-count{color:var(--muted);font-size:14px}
+.dict-group{margin:24px 0}.dict-group h3{font-size:18px;margin:0 0 8px}
+.dict-list{border:1px solid var(--line);border-radius:10px;background:var(--paper)}
+.entry+.entry{border-top:1px solid var(--line)}
+.entry-row{position:relative;display:grid;grid-template-columns:minmax(0,1.15fr) auto minmax(0,1fr) 14px;gap:12px;align-items:center;padding:9px 14px}
+.entry-row::after{content:"⌄";color:var(--muted);pointer-events:none;justify-self:center}
+.entry-row:has([aria-expanded="true"])::after{transform:rotate(180deg)}
+.entry-toggle{background:none;border:0;padding:0;text-align:left;min-width:0}
+.entry-toggle::after{content:"";position:absolute;inset:0;border-radius:6px}
+.entry-toggle:focus-visible{outline:none}.entry-toggle:focus-visible::after{outline:3px solid #8174b5;outline-offset:-3px}
+.entry-row .term{font-size:clamp(20px,3.8vw,27px);overflow-wrap:anywhere}.entry-row .term span{display:inline}
+.entry-row .meaning{font-size:16px;font-weight:500;overflow-wrap:anywhere}
+.reveal{position:relative;z-index:1;min-width:48px;min-height:44px;width:100%;padding:6px;text-align:left;background:transparent}
+.reveal.masked{border:1px dashed #a9abb2;background:#f6f4ef}
+.reveal:not(.masked){border-color:transparent}
+.entry .example{margin:0 14px;padding:12px 0 15px}.entry .example p{font-size:20px}
+.entry .example .reveal{display:block;margin-top:6px}
+#dict-audio:not(:empty){position:sticky;bottom:10px;z-index:3;margin:10px 0;padding:10px 14px;border:1px solid var(--line);border-radius:8px;background:var(--paper);box-shadow:0 2px 10px #34394a22}
+@media(max-width:480px){.dict-controls{gap:4px}.search{flex-basis:100%}.entry-row{gap:7px;padding:8px;grid-template-columns:minmax(0,1.15fr) 44px minmax(0,1fr) 12px}.entry-row .meaning{font-size:15px}.home-actions{gap:6px}.home-actions button{padding-inline:12px}}
+[hidden]{display:none!important}
+@media(max-width:600px){main{padding-top:19px}header{padding:18px 0}.deck-art{width:57px;height:43px}.groups{grid-template-columns:1fr;gap:7px}.group{padding:11px 14px}.section-head{margin-top:16px}.subtle{padding-inline:7px}.settings{margin:12px 0}.nav{gap:6px}.nav button{padding-inline:6px}.flash{margin-top:14px}.toolbar{flex-wrap:wrap}}
+</style>
+</head>
+<body><main>
+<header><div><p class="french-title" lang="fr">Carnet de vocabulaire</p><h1>法文單詞卡</h1></div><div class="deck-art" aria-hidden="true"><i></i></div></header>
+<section id="home" aria-labelledby="group-title">
+<div class="section-head"><div><h2 class="section-title" id="group-title">選擇分類</h2><p class="muted summary" id="total"></p></div><div class="tools"><button class="subtle" id="all">全選</button><button class="subtle" id="none">全部取消</button></div></div>
+<div id="groups" class="groups"></div>
+<div class="settings"><label class="mode"><input id="reverse" class="switch" type="checkbox" role="switch"><span><strong>反向模式</strong><span class="hint">先睇中文或日文，翻卡睇法文</span></span></label></div>
+<div class="toolbar"><span id="selection" aria-live="polite" class="selection"></span><div class="home-actions"><button id="open-dict">字典</button><button id="start" class="primary">開始練習 →</button></div></div>
+<p class="voice-info" id="voice-name" role="status"></p>
+</section>
+<section id="dictionary" aria-labelledby="dict-title" hidden>
+<div class="study-head"><button id="dict-back" class="subtle">← 返回主畫面</button></div>
+<h2 class="section-title" id="dict-title" tabindex="-1">字典</h2>
+<div class="dict-controls"><input type="search" id="dict-search" class="search" aria-label="搜尋法文、中文或日文" placeholder="搜尋法文、中文或日文" autocomplete="off">
+<label class="mode"><input type="checkbox" role="switch" id="hide-trans" class="switch"><span><strong>隱藏翻譯</strong><span class="hint">點空白格睇答案</span></span></label></div>
+<p id="dict-count" class="dict-count" role="status"></p><div id="dict-groups"></div>
+<p id="dict-audio" class="audio-status" role="status"></p>
+</section>
+<section id="study" aria-label="單詞卡練習" hidden>
+<div class="study-head"><button id="back" class="subtle">← 返回主畫面</button><strong id="progress" aria-live="polite"></strong></div>
+<div class="meter" aria-hidden="true"><div id="fill"></div></div>
+<div class="flash"><div class="row"><strong id="category" class="card-tag"></strong><span id="side" class="side"></span></div>
+<div id="content" class="content" aria-live="polite"></div><p class="flip-hint" id="flip-hint"></p><button id="flip" class="flip" aria-label="翻卡"></button></div>
+<div class="nav"><button id="prev">← 上一張</button><button id="shuffle">重新洗牌</button><button id="next" class="primary">下一張 →</button></div>
+<p id="audio-status" role="status" class="audio-status"></p>
+</section>
+</main>
+<script>
+"use strict";
+const byId = id => document.getElementById(id);
+const groups = new Map();
+for (const word of WORDS) {
+  if (!groups.has(word.group)) groups.set(word.group, []);
+  groups.get(word.group).push(word);
+}
+let deck = [];
+let index = 0;
+let flipped = false;
+const boxes = new Map();
+const synth = window.speechSynthesis;
+const noFrench = "此瀏覽器未有法文語音，請用 Chrome 或 Edge 打開，或在系統設定加入法文語音。";
+let frenchVoice = null;
+let waitingForVoices = false;
+let voiceTimer;
+let pendingText = "";
+let activeSpeech;
+function audioStatus(message) {
+  byId(byId("dictionary").hidden ? "audio-status" : "dict-audio").textContent = message;
+}
+function refreshVoices(initial = false) {
+  const available = synth && window.SpeechSynthesisUtterance ? synth.getVoices() : [];
+  const french = available.filter(v => /^fr/i.test(v.lang));
+  const locale = v => v.lang.toLowerCase().replace(/_/g, "-");
+  frenchVoice = french.find(v => locale(v) === "fr-fr") ||
+                french.find(v => locale(v) === "fr-ca") || french[0] || null;
+  clearTimeout(voiceTimer);
+  waitingForVoices = Boolean(initial && synth && window.SpeechSynthesisUtterance && !available.length);
+  if (waitingForVoices) {
+    byId("voice-name").textContent = "語音：正在載入法文語音…";
+    voiceTimer = setTimeout(() => {
+      waitingForVoices = false;
+      byId("voice-name").textContent = "語音：" + noFrench;
+      if (pendingText) audioStatus(noFrench);
+      pendingText = "";
+    }, 3500);
+    return;
+  }
+  byId("voice-name").textContent = "語音：" + (frenchVoice ? frenchVoice.name : noFrench);
+  if (pendingText) {
+    const text = pendingText;
+    pendingText = "";
+    speak(text);
+  } else if (frenchVoice) {
+    audioStatus("");
+  }
+}
+if (synth) synth.addEventListener("voiceschanged", () => refreshVoices());
+refreshVoices(true);
+function stopSpeech() {
+  pendingText = "";
+  activeSpeech = null;
+  if (synth) synth.cancel();
+  audioStatus("");
+}
+function speak(text) {
+  stopSpeech();
+  if (waitingForVoices) {
+    pendingText = text;
+    audioStatus("正在載入法文語音…");
+    return;
+  }
+  if (!frenchVoice) {
+    audioStatus(noFrench);
+    return;
+  }
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.voice = frenchVoice;
+  utterance.lang = frenchVoice.lang;
+  utterance.rate = 0.9;
+  activeSpeech = utterance;
+  utterance.onerror = () => {
+    if (activeSpeech === utterance) audioStatus("暫時讀唔到，請檢查裝置嘅法文語音設定。");
+  };
+  synth.speak(utterance);
+}
+function element(tag, cls, text) {
+  const node = document.createElement(tag);
+  if (cls) node.className = cls;
+  if (text != null) node.textContent = text;
+  return node;
+}
+function soundButton(text, label) {
+  const button = element("button", "sound", "🔊");
+  button.setAttribute("aria-label", label);
+  button.title = label;
+  button.onclick = () => speak(text);
+  return button;
+}
+function joinArticle(article, fr) {
+  if (!article) return fr;
+  return article + (/['’]$/.test(article) ? "" : " ") + fr;
+}
+function forms(word) {
+  if (word.gender === "mf") {
+    const pair = word.fr.split(/\s*,\s*/);
+    if (pair.length === 2) {
+      const articles = word.article.split(/\s*\/\s*/);
+      return pair.map((fr, i) => ({
+        text: joinArticle(articles[i] ?? articles[0], fr), gender: i === 0 ? "m" : "f"
+      }));
+    }
+  }
+  return [{text: joinArticle(word.article, word.fr), gender: word.gender}];
+}
+function frenchTerm(parts) {
+  const term = element("span", "term");
+  term.lang = "fr";
+  parts.forEach((part, i) => {
+    if (i) term.append(element("span", "separator", " / "));
+    term.append(element("span", part.gender, part.text));
+  });
+  return term;
+}
+function wordAudio(parts) {
+  const spoken = parts.map(part => part.text.replace(/\(([^)]+)\)$/, "")).join(". ");
+  return soundButton(spoken, "朗讀法文單詞");
+}
+function french(word) {
+  const parts = forms(word);
+  const labels = {m:"陽性", f:"陰性", mf:"陽性／陰性"};
+  byId("content").append(frenchTerm(parts));
+  if (labels[word.gender]) byId("content").append(element("small", "gender", labels[word.gender]));
+  byId("content").append(wordAudio(parts));
+}
+function translation(word) {
+  const japanese = word.lang === "ja";
+  const line = element("span", "meaning", japanese ? (word.ja || "（未填日文）") : word.zh);
+  line.lang = japanese && word.ja ? "ja" : "zh-HK";
+  if (!japanese && word.zh_auto) line.append(element("small", "ai", "AI 翻譯"));
+  return line;
+}
+function maskTranslation(line, label) {
+  const button = element("button", "reveal masked");
+  line.hidden = true;
+  button.append(line);
+  button.setAttribute("aria-label", "顯示" + label);
+  button.setAttribute("aria-expanded", "false");
+  button.onclick = () => {
+    line.hidden = !line.hidden;
+    button.classList.toggle("masked", line.hidden);
+    button.setAttribute("aria-expanded", String(!line.hidden));
+    if (line.hidden) button.setAttribute("aria-label", "顯示" + label);
+    else button.removeAttribute("aria-label");
+  };
+  return button;
+}
+function example(word, mask = false) {
+  const block = element("div", "example");
+  if (word.ex_fr) {
+    const line = element("p", "", word.ex_fr);
+    line.lang = "fr";
+    line.append(soundButton(word.ex_fr, "朗讀法文例句"));
+    block.append(line);
+  }
+  if (word.ex_zh) {
+    const line = element("small", "", word.ex_zh);
+    block.append(mask ? maskTranslation(line, "例句翻譯") : line);
+  }
+  return block;
+}
+function searchKey(value) {
+  return value.normalize("NFKC").toLowerCase().normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "").normalize("NFC")
+    .replace(/œ/g, "oe").replace(/æ/g, "ae").replace(/[’‘ʼ]/g, "'").trim();
+}
+const expandedWords = new Set();
+function dictionaryEntry(word, mask) {
+  const entry = element("div", "entry");
+  const row = element("div", "entry-row");
+  const parts = forms(word);
+  const toggle = element("button", "entry-toggle");
+  toggle.append(frenchTerm(parts));
+  toggle.setAttribute("aria-expanded", "false");
+  const line = translation(word);
+  row.append(toggle, wordAudio(parts), mask ? maskTranslation(line, "詞義") : line);
+  entry.append(row);
+  let detail;
+  function setExpanded(open) {
+    if (!detail) {
+      detail = example(word, mask);
+      if (!detail.childElementCount) detail.textContent = "未有例句";
+      detail.hidden = true;
+      entry.append(detail);
+    }
+    detail.hidden = !open;
+    toggle.setAttribute("aria-expanded", String(open));
+  }
+  toggle.onclick = () => {
+    const open = !expandedWords.has(word);
+    if (open) expandedWords.add(word); else expandedWords.delete(word);
+    setExpanded(open);
+  };
+  if (expandedWords.has(word)) setExpanded(true);
+  return entry;
+}
+function renderDictionary() {
+  stopSpeech();
+  const query = searchKey(byId("dict-search").value);
+  const mask = byId("hide-trans").checked;
+  const sections = document.createDocumentFragment();
+  let count = 0;
+  for (const [name, words] of groups) {
+    if (!boxes.get(name).checked) continue;
+    const list = element("div", "dict-list");
+    for (const word of words) {
+      if (query) {
+        const fields = [word.fr, word.zh, word.ja, ...forms(word).map(part => part.text)];
+        const matches = fields.some(field => {
+          const key = searchKey(field);
+          return key.includes(query) || key.replace(/[()]/g, "").includes(query);
+        });
+        if (!matches) continue;
+      }
+      list.append(dictionaryEntry(word, mask));
+      count++;
+    }
+    if (list.childElementCount) {
+      const section = element("section", "dict-group");
+      section.append(element("h3", "", name), list);
+      sections.append(section);
+    }
+  }
+  byId("dict-groups").replaceChildren(sections);
+  byId("dict-count").textContent = count ? "共 " + count + " 個詞條" : "已選分類入面搵唔到相符詞條。";
+}
+function showCard() {
+  stopSpeech();
+  const word = deck[index];
+  byId("content").replaceChildren();
+  const showFrench = byId("reverse").checked === flipped;
+  if (showFrench) french(word); else byId("content").append(translation(word));
+  if (flipped && (word.ex_fr || word.ex_zh)) byId("content").append(example(word));
+  byId("category").textContent = word.group;
+  byId("side").textContent = flipped ? "背面" : "正面";
+  byId("flip-hint").textContent = flipped ? "點一下翻返正面" : "點一下揭曉答案";
+  byId("flip").setAttribute("aria-label", byId("flip-hint").textContent);
+  byId("progress").textContent = (index + 1) + " / " + deck.length;
+  byId("fill").style.width = ((index + 1) / deck.length * 100) + "%";
+  byId("prev").disabled = index === 0;
+  byId("next").disabled = index === deck.length - 1;
+}
+function shuffle() {
+  for (let i = deck.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [deck[i], deck[j]] = [deck[j], deck[i]];
+  }
+  index = 0;
+  flipped = false;
+  showCard();
+}
+function navigate(step) {
+  const target = index + step;
+  if (target < 0 || target >= deck.length) return;
+  index = target;
+  flipped = false;
+  showCard();
+}
+function syncSelection() {
+  let count = 0;
+  for (const [group, box] of boxes) if (box.checked) count += groups.get(group).length;
+  byId("selection").textContent = "已揀 " + count + " 張";
+  byId("start").disabled = !count;
+  byId("open-dict").disabled = !count;
+}
+for (const [name, words] of groups) {
+  const label = element("label", "group");
+  const box = element("input");
+  box.type = "checkbox";
+  box.checked = true;
+  box.setAttribute("aria-label", name);
+  box.onchange = syncSelection;
+  boxes.set(name, box);
+  const copy = element("span", "group-copy");
+  copy.append(element("b", "", name));
+  const preview = element("span", "preview", words.slice(0,2).map(w => forms(w)[0].text).join(" · "));
+  preview.lang = "fr";
+  copy.append(preview);
+  label.append(box, copy, element("span", "count", words.length + " 張"));
+  byId("groups").append(label);
+}
+function selectAll(checked) {
+  boxes.forEach(box => box.checked = checked);
+  syncSelection();
+}
+byId("all").onclick = () => selectAll(true);
+byId("none").onclick = () => selectAll(false);
+byId("total").textContent = groups.size + " 組 · 共 " + WORDS.length + " 張";
+syncSelection();
+byId("start").onclick = () => {
+  deck = WORDS.filter(w => boxes.get(w.group).checked);
+  if (!deck.length) return;
+  byId("home").hidden = true;
+  byId("study").hidden = false;
+  shuffle();
+  byId("flip").focus({preventScroll:true});
+  window.scrollTo(0,0);
+};
+byId("flip").onclick = () => { flipped = !flipped; showCard(); };
+byId("shuffle").onclick = shuffle;
+byId("prev").onclick = () => navigate(-1);
+byId("next").onclick = () => navigate(1);
+byId("open-dict").onclick = () => {
+  expandedWords.clear();
+  byId("dict-search").value = "";
+  byId("home").hidden = true;
+  byId("dictionary").hidden = false;
+  renderDictionary();
+  byId("dict-title").focus({preventScroll:true});
+  window.scrollTo(0,0);
+};
+byId("dict-search").oninput = renderDictionary;
+byId("hide-trans").onchange = renderDictionary;
+byId("dict-back").onclick = () => {
+  stopSpeech();
+  byId("dictionary").hidden = true;
+  byId("home").hidden = false;
+  byId("open-dict").focus({preventScroll:true});
+  window.scrollTo(0,0);
+};
+byId("back").onclick = () => {
+  stopSpeech();
+  byId("study").hidden = true;
+  byId("home").hidden = false;
+  byId("start").focus({preventScroll:true});
+  window.scrollTo(0,0);
+};
+document.addEventListener("keydown", event => {
+  if (byId("study").hidden || event.altKey || event.ctrlKey || event.metaKey) return;
+  if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+    event.preventDefault();
+    navigate(event.key === "ArrowLeft" ? -1 : 1);
+  }
+});
+</script>
+</body>
+</html>
