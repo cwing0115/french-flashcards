@@ -571,7 +571,13 @@ button,input{font:inherit}button{cursor:pointer;border:1px solid var(--line);bor
 .flip{position:absolute;inset:0;width:100%;height:100%;z-index:1;border:0;background:transparent;border-radius:inherit}.flip:hover:enabled{background:transparent}.flip-hint{text-align:center;color:var(--muted);font-size:13px}
 .nav{display:grid;grid-template-columns:1fr auto 1fr}.nav button:last-child{justify-self:stretch}.audio-status{min-height:1.5em;text-align:center;margin-top:12px;color:#8b3b35;font-size:14px}
 .home-actions,.dict-controls{display:flex;align-items:center;gap:10px}
-.voice-info{margin-top:15px;font-size:13px;color:var(--muted);overflow-wrap:anywhere}
+.voice-setting{display:flex;align-items:center;flex-wrap:wrap;gap:6px 14px;margin:8px 0}
+.voice-setting label{font-weight:650}
+.voice-setting select{font:inherit;max-width:100%;min-width:0;padding:8px;border:1px solid var(--line);border-radius:8px;color:var(--ink);background:var(--paper)}
+#voice-name:not(:empty){margin-bottom:8px}
+.pron-links{display:flex;gap:5px;flex-wrap:wrap}
+.pron-links a{position:relative;z-index:2;display:inline-flex;align-items:center;min-height:28px;padding:2px 7px;border:1px solid var(--line);border-radius:6px;background:var(--paper);color:var(--accent);font-size:13px;text-decoration:none}
+.pron-links a:hover{border-color:var(--accent);text-decoration:underline}
 .dict-controls{flex-wrap:wrap;justify-content:space-between;margin:15px 0 8px}
 .search{flex:1 1 240px;min-width:0;font:inherit;font-size:16px;padding:12px 14px;border:1px solid #aeb4c0;border-radius:8px;background:var(--paper);color:var(--ink)}
 .dict-controls .mode{gap:9px}.dict-count{color:var(--muted);font-size:14px}
@@ -619,11 +625,12 @@ button,input{font:inherit}button{cursor:pointer;border:1px solid var(--line);bor
 <div id="groups" class="groups"></div>
 <div class="settings"><label class="mode"><input id="reverse" class="switch" type="checkbox" role="switch"><span><strong>反向模式</strong><span class="hint">先睇中文或日文，翻卡睇法文</span></span></label>
 <label class="mode"><input id="definite-articles" class="switch" type="checkbox" role="switch" aria-label="使用定冠詞 le/la"><span><strong>冠詞：un/une ↔ le/la</strong><span class="hint" id="article-mode"></span></span></label>
-<label class="mode"><input id="only-unfamiliar" class="switch" type="checkbox" role="switch"><span><strong>只溫唔熟的字</strong><span class="hint">由已揀分類中，練習標咗星嘅單詞</span></span></label></div>
+<label class="mode"><input id="only-unfamiliar" class="switch" type="checkbox" role="switch"><span><strong>只溫唔熟的字</strong><span class="hint">由已揀分類中，練習標咗星嘅單詞</span></span></label>
+<div class="voice-setting"><label for="voice-select">語音</label><select id="voice-select" aria-describedby="voice-name"></select></div>
+<p class="hint" id="voice-name" role="status"></p></div>
 <div class="toolbar"><span id="selection" aria-live="polite" class="selection"></span><div class="home-actions"><button type="button" onclick="location.href='pronunciation.html'">發音</button><button id="open-dict">字典</button><button id="start" class="primary">開始練習 →</button></div></div>
 <div class="backup-actions"><button id="export-marks">匯出標記</button><button id="import-marks" title="將備份標記合併到目前標記">匯入標記</button><input id="mark-file" type="file" accept=".txt,.json,text/plain,application/json" hidden></div>
 <p id="mark-status" role="status"></p>
-<p class="voice-info" id="voice-name" role="status"></p>
 </section>
 <section id="dictionary" aria-labelledby="dict-title" hidden>
 <div class="study-head"><button id="dict-back" class="subtle">← 返回主畫面</button></div>
@@ -706,6 +713,14 @@ let flipped = false;
 const boxes = new Map();
 const synth = window.speechSynthesis;
 const noFrench = "此瀏覽器未有法文語音，請用 Chrome 或 Edge 打開，或在系統設定加入法文語音。";
+const voiceSelect = byId("voice-select");
+const voicePreference = "french-flashcards.voice.v1";
+let preferredVoice = "";
+try {
+  preferredVoice = localStorage.getItem(voicePreference) || "";
+} catch {
+  // 無法讀取設定時使用自動選擇。
+}
 let frenchVoice = null;
 let waitingForVoices = false;
 let voiceTimer;
@@ -716,23 +731,35 @@ function audioStatus(message) {
 }
 function refreshVoices(initial = false) {
   const available = synth && window.SpeechSynthesisUtterance ? synth.getVoices() : [];
-  const french = available.filter(v => /^fr/i.test(v.lang));
+  const french = available.filter(v => /^fr(?:[-_]|$)/i.test(v.lang));
+  const voiceKey = v => JSON.stringify([v.voiceURI, v.name, v.lang]);
+  const natural = french.filter(v => /natural|online/i.test(v.name));
+  const pool = natural.length ? natural : french;
   const locale = v => v.lang.toLowerCase().replace(/_/g, "-");
-  frenchVoice = french.find(v => locale(v) === "fr-fr") ||
-                french.find(v => locale(v) === "fr-ca") || french[0] || null;
+  const automatic = pool.find(v => locale(v) === "fr-fr") ||
+                    pool.find(v => locale(v) === "fr-ca") || pool[0];
+  const selected = french.find(v => voiceKey(v) === preferredVoice);
+  frenchVoice = selected || automatic || null;
+  const autoLabel = automatic ? "自動（" + automatic.name + "）" : "自動";
+  voiceSelect.replaceChildren(new Option(autoLabel, ""));
+  for (const voice of french) {
+    voiceSelect.add(new Option(voice.name + " · " + voice.lang, voiceKey(voice)));
+  }
+  voiceSelect.value = selected ? preferredVoice : "";
+  voiceSelect.disabled = !french.length;
   clearTimeout(voiceTimer);
   waitingForVoices = Boolean(initial && synth && window.SpeechSynthesisUtterance && !available.length);
   if (waitingForVoices) {
-    byId("voice-name").textContent = "語音：正在載入法文語音…";
+    byId("voice-name").textContent = "正在載入法文語音…";
     voiceTimer = setTimeout(() => {
       waitingForVoices = false;
-      byId("voice-name").textContent = "語音：" + noFrench;
+      byId("voice-name").textContent = noFrench;
       if (pendingText) audioStatus(noFrench);
       pendingText = "";
     }, 3500);
     return;
   }
-  byId("voice-name").textContent = "語音：" + (frenchVoice ? frenchVoice.name : noFrench);
+  byId("voice-name").textContent = frenchVoice ? "" : noFrench;
   if (pendingText) {
     const text = pendingText;
     pendingText = "";
@@ -741,6 +768,15 @@ function refreshVoices(initial = false) {
     audioStatus("");
   }
 }
+voiceSelect.onchange = () => {
+  preferredVoice = voiceSelect.value;
+  refreshVoices();
+  try {
+    localStorage.setItem(voicePreference, preferredVoice);
+  } catch {
+    byId("voice-name").textContent = "今次已套用，瀏覽器暫時未能記住呢個選擇。";
+  }
+};
 if (synth) synth.addEventListener("voiceschanged", () => refreshVoices());
 refreshVoices(true);
 function stopSpeech() {
@@ -782,6 +818,23 @@ function soundButton(text, label) {
   button.title = label;
   button.onclick = () => speak(text);
   return button;
+}
+function pronunciationLinks(word) {
+  const term = (word.gender === "mf" ? word.fr.split(",")[0].replace(/\([^()]+\)$/, "") : word.fr).trim();
+  const encoded = encodeURIComponent(term);
+  const links = element("span", "pron-links");
+  for (const [name, href] of [
+    ["Forvo", "https://forvo.com/word/" + encoded + "/#fr"],
+    ["YouGlish", "https://youglish.com/pronounce/" + encoded + "/french"]
+  ]) {
+    const link = element("a", "", name);
+    link.href = href;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    link.setAttribute("aria-label", name + "：" + term + "（新分頁）");
+    links.append(link);
+  }
+  return links;
 }
 function joinArticle(article, fr) {
   if (!article) return fr;
@@ -1018,7 +1071,7 @@ function dictionaryEntry(word, mask) {
   toggle.setAttribute("aria-expanded", "false");
   const line = translation(word);
   const termCell = element("div", "entry-term");
-  termCell.append(toggle);
+  termCell.append(toggle, pronunciationLinks(word));
   appendUsual(termCell, word);
   row.append(termCell, wordAudio(parts), mask ? maskTranslation(line, "詞義") : line, markButton(word));
   entry.append(row);
@@ -1084,6 +1137,7 @@ function showCard() {
   byId("content").replaceChildren();
   const showFrench = byId("reverse").checked === flipped;
   if (showFrench) french(word); else byId("content").append(translation(word));
+  if (flipped) byId("content").append(pronunciationLinks(word));
   if (flipped && (word.ex_fr || word.ex_zh)) byId("content").append(example(word));
   if (flipped) byId("content").append(markButton(word));
   byId("category").textContent = word.group;
