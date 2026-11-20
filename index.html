@@ -538,14 +538,26 @@ h1{font-family:"Noto Serif TC","Songti TC","PMingLiU",serif;font-size:clamp(32px
 .deck-art{display:grid;place-items:center;width:76px;height:56px;margin-right:10px;transform:rotate(6deg);border:1px solid #aaa99b;border-radius:4px;background:repeating-linear-gradient(transparent 0 10px,#d5d9e0 10px 11px) var(--paper);box-shadow:-5px 4px 0 #c9cbb9,-8px 7px 0 #e1d1b6}
 .deck-art i{width:12px;height:20px;background:#a85649;align-self:start;justify-self:end;margin-right:10px;clip-path:polygon(0 0,100% 0,100% 100%,50% 76%,0 100%)}
 .section-head,.toolbar,.row,.study-head,.nav{display:flex;align-items:center;justify-content:space-between;gap:10px}
-.section-head{margin:24px 0 12px}.section-title{font-size:20px}.muted,.preview,.hint{color:var(--muted)}.summary{font-size:14px;margin-top:4px}
+.section-head{margin:24px 0 12px}.section-title{font-size:20px}.muted,.hint{color:var(--muted)}.summary{font-size:14px;margin-top:4px}
 button,input{font:inherit}button{cursor:pointer;border:1px solid var(--line);border-radius:8px;color:var(--ink);background:var(--paper);min-height:44px;padding:8px 14px;font-weight:600}button:hover:enabled{border-color:var(--accent)}button:disabled{opacity:.45;cursor:default}
 :focus-visible{outline:3px solid #8174b5;outline-offset:3px}button,input,label{-webkit-tap-highlight-color:transparent}
 .tools{display:flex;gap:4px}.subtle{font-size:14px;background:transparent;border-color:transparent;padding:7px 10px;color:var(--accent)}
-.groups{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px}
-.group{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:12px;background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:15px;cursor:pointer;min-width:0}
-.group:has(input:checked){border-color:#b5bdc9}.group:hover{box-shadow:0 2px 8px #33394d13}
-.group input{width:18px;height:18px;accent-color:var(--accent);margin:0}.group b{font-size:16px}.preview{display:block;font:italic 15px/1.4 Baskervville,Georgia,serif;margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.group-copy{min-width:0}.count{font-size:14px;color:#525d70;font-variant-numeric:tabular-nums}
+.groups{display:grid;gap:8px}
+.category{border:1px solid var(--line);border-radius:10px;background:var(--paper)}
+.category-row,.group{display:flex;align-items:center;gap:10px;min-width:0}
+.category-row{padding:0 5px 0 14px}
+.group{flex:1;min-height:44px;cursor:pointer}
+.group input{flex:none;width:18px;height:18px;accent-color:var(--accent);margin:0}
+.group-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.category-row .group-name{font-weight:650}
+.count{color:var(--muted);font-size:14px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.category-toggle{width:40px;padding:0;border:0;background:transparent;color:var(--accent)}
+.category-toggle::before{content:"›";display:inline-block;font-size:22px}
+.category-toggle[aria-expanded="true"]::before{transform:rotate(90deg)}
+.subgroups{border-top:1px solid var(--line);padding:0 55px 0 32px}
+.subgroups .group+.group{border-top:1px solid var(--line)}
+.notice{margin-top:16px;color:#714a16}
+@media(max-width:440px){.group,.category-row{gap:6px}.category-row{padding-left:8px}.count{font-size:12px}.subgroups{padding:0 12px 0 22px}.group-name{font-size:14px}.category-toggle{width:30px}}
 .mode{display:flex;align-items:center;gap:14px;cursor:pointer;min-height:52px}.mode strong{display:block}.hint{font-size:13px;display:block;margin-top:3px}
 .switch{appearance:none;flex:none;width:43px;height:26px;border-radius:18px;background:#83858b;margin:0;position:relative;cursor:pointer}.switch:before{content:"";position:absolute;left:3px;top:3px;width:20px;height:20px;border-radius:50%;background:white}.switch:checked{background:var(--accent)}.switch:checked:before{transform:translateX(17px)}
 .settings{margin:16px 0;padding:6px 2px;border-block:1px solid var(--line)}
@@ -563,7 +575,8 @@ button,input{font:inherit}button{cursor:pointer;border:1px solid var(--line);bor
 .dict-controls{flex-wrap:wrap;justify-content:space-between;margin:15px 0 8px}
 .search{flex:1 1 240px;min-width:0;font:inherit;font-size:16px;padding:12px 14px;border:1px solid #aeb4c0;border-radius:8px;background:var(--paper);color:var(--ink)}
 .dict-controls .mode{gap:9px}.dict-count{color:var(--muted);font-size:14px}
-.dict-group{margin:24px 0}.dict-group h3{font-size:18px;margin:0 0 8px}
+.dict-section{margin:24px 0}.dict-section h3{font-size:21px;margin:0;padding-bottom:6px;border-bottom:2px solid var(--line)}
+.dict-group{margin:14px 0 20px}.dict-group h4{font-size:16px;margin:0 0 8px}
 .dict-list{border:1px solid var(--line);border-radius:10px;background:var(--paper)}
 .entry+.entry{border-top:1px solid var(--line)}
 .entry-row{position:relative;display:grid;grid-template-columns:minmax(0,1.15fr) auto minmax(0,1fr) 14px;gap:12px;align-items:center;padding:9px 14px}
@@ -583,7 +596,6 @@ button,input{font:inherit}button{cursor:pointer;border:1px solid var(--line);bor
 @media(max-width:480px){.dict-controls{gap:4px}.search{flex-basis:100%}.entry-row{gap:7px;padding:8px;grid-template-columns:minmax(0,1.15fr) 44px minmax(0,1fr) 12px}.entry-row .meaning{font-size:15px}.home-actions{gap:6px}.home-actions button{padding-inline:12px}}
 .mark-word{position:relative;z-index:2;min-height:44px;white-space:nowrap;font-size:14px;padding-inline:9px}
 .mark-word[aria-pressed="true"]{background:#fff0c4;color:#654400;border-color:#b48c38}
-.group-counts{text-align:right}.group-counts small{display:block;font-size:12px;color:var(--muted)}
 .backup-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
 #mark-status:not(:empty){margin-top:8px;color:var(--muted);font-size:14px}
 .entry-row{grid-template-columns:minmax(0,1.15fr) auto minmax(0,1fr) auto 14px}
@@ -593,12 +605,13 @@ button,input{font:inherit}button{cursor:pointer;border:1px solid var(--line);bor
   .entry-row>.meaning,.entry-row>.reveal{grid-area:meaning}.entry-row::after{grid-area:arrow}
 }
 [hidden]{display:none!important}
-@media(max-width:600px){main{padding-top:19px}header{padding:18px 0}.deck-art{width:57px;height:43px}.groups{grid-template-columns:1fr;gap:7px}.group{padding:11px 14px}.section-head{margin-top:16px}.subtle{padding-inline:7px}.settings{margin:12px 0}.nav{gap:6px}.nav button{padding-inline:6px}.flash{margin-top:14px}.toolbar{flex-wrap:wrap}}
+@media(max-width:600px){main{padding-top:19px}header{padding:18px 0}.deck-art{width:57px;height:43px}.section-head{margin-top:16px}.subtle{padding-inline:7px}.settings{margin:12px 0}.nav{gap:6px}.nav button{padding-inline:6px}.flash{margin-top:14px}.toolbar{flex-wrap:wrap}}
 </style>
 </head>
 <body><main>
 <header><div><p class="french-title" lang="fr">Carnet de vocabulaire</p><h1>法文單詞卡</h1></div><div class="deck-art" aria-hidden="true"><i></i></div></header>
 <section id="home" aria-labelledby="group-title">
+<p id="unmapped" class="notice" hidden></p>
 <div class="section-head"><div><h2 class="section-title" id="group-title">選擇分類</h2><p class="muted summary" id="total"></p></div><div class="tools"><button class="subtle" id="all">全選</button><button class="subtle" id="none">全部取消</button></div></div>
 <div id="groups" class="groups"></div>
 <div class="settings"><label class="mode"><input id="reverse" class="switch" type="checkbox" role="switch"><span><strong>反向模式</strong><span class="hint">先睇中文或日文，翻卡睇法文</span></span></label>
@@ -633,6 +646,55 @@ const groups = new Map();
 for (const word of WORDS) {
   if (!groups.has(word.group)) groups.set(word.group, []);
   groups.get(word.group).push(word);
+}
+// 細分類 → 大分類。列出嘅次序亦係主畫面同字典嘅顯示次序。
+const SECTIONS = new Map([
+  ["家族・朋友・人物", "人物・生活"],
+  ["人生", "人物・生活"],
+  ["心情", "人物・生活"],
+  ["身體", "人物・生活"],
+  ["住所・日用品", "屋企・日用品"],
+  ["隨身物品", "屋企・日用品"],
+  ["飲食", "飲食"],
+  ["食物", "飲食"],
+  ["方向", "城市・出行"],
+  ["旅行", "城市・出行"],
+  ["交通", "城市・出行"],
+  ["街道・設施", "城市・出行"],
+  ["購物・金錢", "城市・出行"],
+  ["位置・形狀", "城市・出行"],
+  ["學校・教育", "學校・興趣・時間"],
+  ["興趣・運動", "學校・興趣・時間"],
+  ["時間", "學校・興趣・時間"],
+  ["動物", "自然"],
+  ["自然・地形", "自然"],
+  ["自然・天氣", "自然"],
+  ["基本動詞", "動詞"],
+  ["感情・知覺", "動詞"],
+  ["移動・動作", "動詞"],
+  ["思考・判斷", "動詞"],
+  ["日常動作", "動詞"],
+  ["溝通", "動詞"],
+  ["生活・動作", "動詞"],
+  ["動作・狀態", "動詞"],
+  ["人的動作", "動詞"],
+  ["學習", "動詞"],
+  ["事物的特徵", "形容詞・副詞"],
+  ["人的感情・性格", "形容詞・副詞"],
+  ["性質・狀態", "形容詞・副詞"],
+  ["時間・場所", "形容詞・副詞"]
+]);
+const sectionGroups = new Map();
+for (const [group, section] of SECTIONS) {
+  if (!sectionGroups.has(section)) sectionGroups.set(section, []);
+  if (groups.has(group)) sectionGroups.get(section).push(group);
+}
+const unmapped = [...groups.keys()].filter(group => !SECTIONS.has(group));
+if (unmapped.length) {
+  sectionGroups.set("其他", unmapped);
+  const notice = byId("unmapped");
+  notice.textContent = "以下細分類已放入「其他」：" + unmapped.join("、");
+  notice.hidden = false;
 }
 let deck = [];
 let index = 0;
@@ -820,6 +882,7 @@ const expandedWords = new Set();
 const markStorage = "french-flashcards.unfamiliar.v1";
 const markKey = word => JSON.stringify([word.group, word.fr]);
 const groupMarkCounts = new Map();
+const sectionRows = new Map();
 const markedButtons = () => document.querySelectorAll("button.mark-word");
 let marks = new Set();
 
@@ -952,25 +1015,32 @@ function renderDictionary() {
   const mask = byId("hide-trans").checked;
   const sections = document.createDocumentFragment();
   let count = 0;
-  for (const [name, words] of groups) {
-    if (!boxes.get(name).checked) continue;
-    const list = element("div", "dict-list");
-    for (const word of words) {
-      if (query) {
-        const fields = [word.fr, word.zh, word.ja, ...forms(word, false).map(part => part.text), ...forms(word, true).map(part => part.text)];
-        const matches = fields.some(field => {
-          const key = searchKey(field);
-          return key.includes(query) || key.replace(/[()]/g, "").includes(query);
-        });
-        if (!matches) continue;
+  for (const [sectionName, names] of sectionGroups) {
+    const category = element("section", "dict-section");
+    for (const name of names) {
+      if (!boxes.get(name).checked) continue;
+      const list = element("div", "dict-list");
+      for (const word of groups.get(name)) {
+        if (query) {
+          const fields = [word.fr, word.zh, word.ja, ...forms(word, false).map(part => part.text), ...forms(word, true).map(part => part.text)];
+          const matches = fields.some(field => {
+            const key = searchKey(field);
+            return key.includes(query) || key.replace(/[()]/g, "").includes(query);
+          });
+          if (!matches) continue;
+        }
+        list.append(dictionaryEntry(word, mask));
+        count++;
       }
-      list.append(dictionaryEntry(word, mask));
-      count++;
+      if (list.childElementCount) {
+        const section = element("section", "dict-group");
+        section.append(element("h4", "", name), list);
+        category.append(section);
+      }
     }
-    if (list.childElementCount) {
-      const section = element("section", "dict-group");
-      section.append(element("h3", "", name), list);
-      sections.append(section);
+    if (category.childElementCount) {
+      category.prepend(element("h3", "", sectionName));
+      sections.append(category);
     }
   }
   byId("dict-groups").replaceChildren(sections);
@@ -1012,14 +1082,24 @@ function navigate(step) {
 function syncSelection() {
   let selected = 0;
   let unfamiliar = 0;
-  for (const [group, box] of boxes) {
-    const words = groups.get(group);
-    const marked = words.filter(word => marks.has(markKey(word))).length;
-    groupMarkCounts.get(group).textContent = "唔熟：" + marked + " 張";
-    if (box.checked) {
-      selected += words.length;
-      unfamiliar += marked;
+  for (const [section, names] of sectionGroups) {
+    const row = sectionRows.get(section);
+    let checked = 0;
+    let markedInSection = 0;
+    for (const name of names) {
+      const words = groups.get(name);
+      const marked = words.filter(word => marks.has(markKey(word))).length;
+      groupMarkCounts.get(name).textContent = "唔熟 " + marked;
+      markedInSection += marked;
+      if (boxes.get(name).checked) {
+        checked++;
+        selected += words.length;
+        unfamiliar += marked;
+      }
     }
+    row.marked.textContent = "唔熟 " + markedInSection;
+    row.box.checked = checked > 0 && checked === names.length;
+    row.box.indeterminate = checked > 0 && checked < names.length;
   }
   const onlyMarked = byId("only-unfamiliar").checked;
   const count = onlyMarked ? unfamiliar : selected;
@@ -1027,34 +1107,83 @@ function syncSelection() {
   byId("start").disabled = !count;
   byId("open-dict").disabled = !selected;
 }
-for (const [name, words] of groups) {
+const homeStorage = "french-flashcards.categories.v1";
+function loadHomeState() {
+  let state;
+  try {
+    state = JSON.parse(localStorage.getItem(homeStorage));
+  } catch {
+    // 儲存空間未開放或者資料損壞時，用預設選項。
+  }
+  return {
+    selected: new Set(Array.isArray(state?.selected) ? state.selected : []),
+    expanded: new Set(Array.isArray(state?.expanded) ? state.expanded : [])
+  };
+}
+const homeState = loadHomeState();
+function saveHomeState() {
+  const selected = [...boxes.keys()].filter(name => boxes.get(name).checked);
+  try {
+    localStorage.setItem(homeStorage, JSON.stringify({selected, expanded:[...homeState.expanded]}));
+  } catch {
+    byId("mark-status").textContent = "瀏覽器暫時未能儲存分類設定。";
+  }
+}
+function selectionChanged() {
+  syncSelection();
+  saveHomeState();
+}
+function categoryLabel(name, count) {
   const label = element("label", "group");
   const box = element("input");
   box.type = "checkbox";
-  box.checked = true;
   box.setAttribute("aria-label", name);
-  box.onchange = syncSelection;
-  boxes.set(name, box);
-  const copy = element("span", "group-copy");
-  copy.append(element("b", "", name));
-  const preview = element("span", "preview");
-  preview.lang = "fr";
-  copy.append(preview);
-  const counts = element("span", "count group-counts", words.length + " 張");
-  const markedCount = element("small");
-  groupMarkCounts.set(name, markedCount);
-  counts.append(markedCount);
-  label.append(box, copy, counts);
-  byId("groups").append(label);
+  const title = element("span", "group-name", name);
+  title.title = name;
+  const marked = element("span", "count");
+  label.append(box, title, element("span", "count", count + " 張"), marked);
+  return {label, box, marked};
+}
+for (const [section, names] of sectionGroups) {
+  const category = element("div", "category");
+  const header = element("div", "category-row");
+  const total = names.reduce((sum, name) => sum + groups.get(name).length, 0);
+  const row = categoryLabel(section, total);
+  sectionRows.set(section, row);
+  row.box.disabled = !names.length;
+  row.box.onchange = () => {
+    for (const name of names) boxes.get(name).checked = row.box.checked;
+    selectionChanged();
+  };
+  const children = element("div", "subgroups");
+  children.id = "subgroups-" + sectionRows.size;
+  children.hidden = !homeState.expanded.has(section);
+  const toggle = element("button", "category-toggle");
+  toggle.type = "button";
+  toggle.setAttribute("aria-label", section + "細分類");
+  toggle.setAttribute("aria-controls", children.id);
+  toggle.setAttribute("aria-expanded", String(!children.hidden));
+  toggle.onclick = () => {
+    children.hidden = !children.hidden;
+    toggle.setAttribute("aria-expanded", String(!children.hidden));
+    if (children.hidden) homeState.expanded.delete(section);
+    else homeState.expanded.add(section);
+    saveHomeState();
+  };
+  header.append(row.label, toggle);
+  for (const name of names) {
+    const child = categoryLabel(name, groups.get(name).length);
+    child.box.checked = homeState.selected.has(name);
+    child.box.onchange = selectionChanged;
+    groupMarkCounts.set(name, child.marked);
+    boxes.set(name, child.box);
+    children.append(child.label);
+  }
+  category.append(header, children);
+  byId("groups").append(category);
 }
 function refreshArticleMode() {
   byId("article-mode").textContent = articleSwitch.checked ? "目前使用 le / la / l’ / les" : "目前使用 un / une / des";
-  for (const [name, box] of boxes) {
-    const preview = box.closest(".group").querySelector(".preview");
-    preview.textContent = groups.get(name).slice(0, 2).map(word =>
-      forms(word).map(part => part.display ?? part.text).join(" / ")
-    ).join(" · ");
-  }
 }
 refreshArticleMode();
 articleSwitch.onchange = () => {
@@ -1067,12 +1196,12 @@ articleSwitch.onchange = () => {
 };
 function selectAll(checked) {
   boxes.forEach(box => box.checked = checked);
-  syncSelection();
+  selectionChanged();
 }
 byId("only-unfamiliar").onchange = syncSelection;
 byId("all").onclick = () => selectAll(true);
 byId("none").onclick = () => selectAll(false);
-byId("total").textContent = groups.size + " 組 · 共 " + WORDS.length + " 張";
+byId("total").textContent = sectionGroups.size + " 個大分類 · " + groups.size + " 個細分類 · 共 " + WORDS.length + " 張";
 syncSelection();
 byId("start").onclick = () => {
   const onlyMarked = byId("only-unfamiliar").checked;
