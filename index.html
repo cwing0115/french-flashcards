@@ -580,7 +580,11 @@ button,input{font:inherit}button{cursor:pointer;border:1px solid var(--line);bor
 .pron-links a:hover{border-color:var(--accent);text-decoration:underline}
 .home-actions{flex-wrap:wrap}
 .dictation-card,#dictation-done{margin:16px 0;padding:clamp(16px,4vw,32px);background:var(--paper);border:1px solid var(--line);border-radius:12px}
-.dictation-card{display:grid;gap:18px}
+.dictation-card{display:grid;gap:18px;grid-template-columns:minmax(0,1fr)}
+.dictation-options{display:flex;align-items:center;gap:12px}
+.dictation-options .mode{gap:6px}
+#dictation-card-back{padding:16px 0;border-block:1px solid var(--line)}
+#dictation-audio:empty{display:none}
 #dictation-en{margin-top:5px;color:var(--muted);font-size:18px}
 #dictation-input{display:block;margin:7px 0;width:100%;padding:10px;border:1px solid #aeb4c0;border-radius:8px;font-size:20px;color:var(--ink)}
 #dictation-letters,.dictation-actions{display:flex;gap:6px;flex-wrap:wrap}
@@ -651,7 +655,7 @@ button,input{font:inherit}button{cursor:pointer;border:1px solid var(--line);bor
 <p id="dict-audio" class="audio-status" role="status"></p>
 </section>
 <section id="dictation" aria-labelledby="dictation-title" hidden>
-<div class="study-head"><button id="dictation-back" class="subtle">← 返回主畫面</button><span id="dictation-progress" class="count"></span></div>
+<div class="study-head"><button id="dictation-back" class="subtle">← 返回主畫面</button><div class="dictation-options"><label id="dictation-toggle-label" class="mode"><input id="dictation-live-articles" class="switch" type="checkbox" role="switch"><strong>連冠詞</strong></label><span id="dictation-progress" class="count"></span></div></div>
 <h2 class="section-title" id="dictation-title">默書</h2>
 <form id="dictation-form" class="dictation-card" autocomplete="off">
   <p id="dictation-group" class="card-tag"></p>
@@ -662,7 +666,9 @@ button,input{font:inherit}button{cursor:pointer;border:1px solid var(--line);bor
     <div id="dictation-letters" role="group" aria-label="法文特殊字母"></div>
   </div>
   <p id="dictation-feedback" role="status" aria-live="polite"></p>
-  <div class="dictation-actions"><button class="primary" id="dictation-submit" type="submit">對答案</button><button id="dictation-reveal" type="button">睇答案</button><button id="dictation-skip" type="button" class="subtle">跳過</button></div>
+  <section id="dictation-card-back" class="content" aria-label="卡背" hidden></section>
+  <p id="dictation-audio" class="audio-status" role="status"></p>
+  <div class="dictation-actions"><button class="primary" id="dictation-submit" type="submit">對答案</button><button id="dictation-reveal" type="button" aria-controls="dictation-card-back" aria-expanded="false">睇答案</button><button id="dictation-skip" type="button" class="subtle">跳過</button></div>
 </form>
 <p id="dictation-done" tabindex="-1" hidden>今輪默書已完成。</p>
 </section>
@@ -1340,7 +1346,10 @@ let voiceTimer;
 let pendingText = "";
 let activeSpeech;
 function audioStatus(message) {
-  byId(byId("dictionary").hidden ? "audio-status" : "dict-audio").textContent = message;
+  let target = "audio-status";
+  if (!byId("dictionary").hidden) target = "dict-audio";
+  if (!byId("dictation").hidden) target = "dictation-audio";
+  byId(target).textContent = message;
 }
 function refreshVoices(initial = false) {
   const available = synth && window.SpeechSynthesisUtterance ? synth.getVoices() : [];
@@ -1427,6 +1436,7 @@ function element(tag, cls, text) {
 }
 function soundButton(text, label) {
   const button = element("button", "sound", "🔊");
+  button.type = "button";
   button.setAttribute("aria-label", label);
   button.title = label;
   button.onclick = () => speak(text);
@@ -1508,13 +1518,13 @@ function appendUsual(container, word) {
   line.append(phrase, soundButton(word.usual, "朗讀常用講法：" + word.usual));
   container.append(line);
 }
-function french(word) {
+function french(word, container = byId("content")) {
   const parts = forms(word);
   const labels = {m:"陽性", f:"陰性", mf:"陽性／陰性"};
-  byId("content").append(frenchTerm(parts));
-  if (labels[word.gender]) byId("content").append(element("small", "gender", labels[word.gender]));
-  byId("content").append(wordAudio(parts));
-  appendUsual(byId("content"), word);
+  container.append(frenchTerm(parts));
+  if (labels[word.gender]) container.append(element("small", "gender", labels[word.gender]));
+  container.append(wordAudio(parts));
+  appendUsual(container, word);
 }
 function translation(word) {
   const japanese = word.lang === "ja";
@@ -1912,7 +1922,12 @@ function selectedWords() {
 }
 let dictationWords = [];
 let dictationIndex = 0;
+let dictationPartIndex = 0;
 let expectedAnswer = "";
+const homeArticles = byId("dictation-articles");
+const liveArticles = byId("dictation-live-articles");
+const dictationBack = byId("dictation-card-back");
+const revealAnswer = byId("dictation-reveal");
 let answerClosed = false;
 const dictationInput = byId("dictation-input");
 const dictationFeedback = byId("dictation-feedback");
@@ -1925,31 +1940,39 @@ function withoutAccents(text) {
   return text.normalize("NFD").replace(/\p{M}/gu, "");
 }
 
-function showDictationWord() {
-  const word = dictationWords[dictationIndex];
-  const withArticle = Boolean(word.article && byId("dictation-articles").checked);
-  const parts = forms(word);
+function updateDictationPrompt(word, parts) {
+  const withArticle = Boolean(word.article && homeArticles.checked);
   const answers = parts.map(part => withArticle || !word.article ? part.text :
     part.text.replace(/^(?:(?:un|une|des|le|la|les) |l['’])/, ""));
   const varies = new Set(answers).size > 1;
-  const choice = varies ? Math.floor(Math.random() * answers.length) : 0;
   const hints = [];
-  if (varies) hints.push(parts[choice].gender === "f" ? "陰性" : "陽性");
+  if (varies) hints.push(parts[dictationPartIndex].gender === "f" ? "陰性" : "陽性");
   if (word.article === "les") hints.push("複數");
   if (withArticle) hints.push(articleSwitch.checked ? "連定冠詞" : "連不定冠詞");
-  expectedAnswer = answers[choice];
+  expectedAnswer = answers[dictationPartIndex];
+  byId("dictation-prompt").textContent = hints.length ? "輸入法文（" + hints.join("、") + "）" : "輸入法文";
+}
+
+function showDictationWord() {
+  const word = dictationWords[dictationIndex];
+  const parts = forms(word);
+  dictationPartIndex = parts.length > 1 ? Math.floor(Math.random() * parts.length) : 0;
+  updateDictationPrompt(word, parts);
+  dictationBack.hidden = true;
+  dictationBack.replaceChildren();
+  revealAnswer.textContent = "睇答案";
+  revealAnswer.setAttribute("aria-expanded", "false");
   answerClosed = false;
   byId("dictation-group").textContent = word.group;
   byId("dictation-zh").textContent = word.zh;
   byId("dictation-en").textContent = DICTATION_ENGLISH[word.group]?.[word.fr] || "（未有英文提示）";
   byId("dictation-progress").textContent = (dictationIndex + 1) + " / " + dictationWords.length;
-  byId("dictation-prompt").textContent = hints.length ? "輸入法文（" + hints.join("、") + "）" : "輸入法文";
   dictationFeedback.textContent = "";
   dictationInput.value = "";
   dictationInput.readOnly = false;
   byId("dictation-letters").hidden = false;
   byId("dictation-submit").textContent = "對答案";
-  byId("dictation-reveal").hidden = false;
+  revealAnswer.hidden = false;
   byId("dictation-skip").hidden = false;
   dictationInput.focus();
 }
@@ -1959,13 +1982,14 @@ function closeDictationAnswer(message) {
   dictationInput.readOnly = true;
   dictationFeedback.textContent = message;
   byId("dictation-letters").hidden = true;
-  byId("dictation-reveal").hidden = true;
+  revealAnswer.textContent = "睇卡背";
   byId("dictation-skip").hidden = true;
   byId("dictation-submit").textContent = dictationIndex + 1 === dictationWords.length ? "完成" : "下一題";
   byId("dictation-submit").focus();
 }
 
 function advanceDictation() {
+  stopSpeech();
   dictationIndex++;
   if (dictationIndex < dictationWords.length) {
     showDictationWord();
@@ -1973,6 +1997,7 @@ function advanceDictation() {
   }
   byId("dictation-form").hidden = true;
   byId("dictation-done").hidden = false;
+  byId("dictation-toggle-label").hidden = true;
   byId("dictation-done").focus();
 }
 
@@ -2008,7 +2033,39 @@ byId("dictation-form").onsubmit = event => {
   else dictationFeedback.textContent = "再試吓。";
   dictationInput.focus();
 };
-byId("dictation-reveal").onclick = () => closeDictationAnswer("正確答案：" + expectedAnswer);
+revealAnswer.onclick = () => {
+  closeDictationAnswer("今題答案：" + expectedAnswer);
+  const word = dictationWords[dictationIndex];
+  french(word, dictationBack);
+  dictationBack.append(translation(word), pronunciationLinks(word));
+  if (word.ex_fr || word.ex_zh || word.ex_ja) {
+    const block = example(word);
+    if (word.ex_ja) {
+      const japanese = element("small", "", word.ex_ja);
+      japanese.lang = "ja";
+      block.append(japanese);
+    }
+    dictationBack.append(block);
+  }
+  dictationBack.append(markButton(word));
+  dictationBack.hidden = false;
+  revealAnswer.setAttribute("aria-expanded", "true");
+  revealAnswer.hidden = true;
+};
+homeArticles.onchange = () => { liveArticles.checked = homeArticles.checked; };
+liveArticles.onchange = () => {
+  homeArticles.checked = liveArticles.checked;
+  if (answerClosed) {
+    byId("dictation-submit").focus();
+    return;
+  }
+  const word = dictationWords[dictationIndex];
+  if (word.article) {
+    updateDictationPrompt(word, forms(word));
+    dictationFeedback.textContent = "";
+  }
+  dictationInput.focus();
+};
 byId("dictation-skip").onclick = advanceDictation;
 byId("start-dictation").onclick = () => {
   dictationWords = selectedWords();
@@ -2017,12 +2074,15 @@ byId("start-dictation").onclick = () => {
   dictationIndex = 0;
   byId("home").hidden = true;
   byId("dictation").hidden = false;
+  liveArticles.checked = homeArticles.checked;
+  byId("dictation-toggle-label").hidden = false;
   byId("dictation-form").hidden = false;
   byId("dictation-done").hidden = true;
   window.scrollTo(0,0);
   showDictationWord();
 };
 byId("dictation-back").onclick = () => {
+  stopSpeech();
   byId("dictation").hidden = true;
   byId("home").hidden = false;
   byId("start-dictation").focus({preventScroll:true});
