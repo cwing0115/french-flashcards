@@ -602,6 +602,7 @@ button,input{font:inherit}button{cursor:pointer;border:1px solid var(--line);bor
 <div class="section-head"><div><h2 class="section-title" id="group-title">選擇分類</h2><p class="muted summary" id="total"></p></div><div class="tools"><button class="subtle" id="all">全選</button><button class="subtle" id="none">全部取消</button></div></div>
 <div id="groups" class="groups"></div>
 <div class="settings"><label class="mode"><input id="reverse" class="switch" type="checkbox" role="switch"><span><strong>反向模式</strong><span class="hint">先睇中文或日文，翻卡睇法文</span></span></label>
+<label class="mode"><input id="definite-articles" class="switch" type="checkbox" role="switch" aria-label="使用定冠詞 le/la"><span><strong>冠詞：un/une ↔ le/la</strong><span class="hint" id="article-mode"></span></span></label>
 <label class="mode"><input id="only-unfamiliar" class="switch" type="checkbox" role="switch"><span><strong>只溫唔熟的字</strong><span class="hint">由已揀分類中，練習標咗星嘅單詞</span></span></label></div>
 <div class="toolbar"><span id="selection" aria-live="polite" class="selection"></span><div class="home-actions"><button type="button" onclick="location.href='pronunciation.html'">發音</button><button id="open-dict">字典</button><button id="start" class="primary">開始練習 →</button></div></div>
 <div class="backup-actions"><button id="export-marks">匯出標記</button><button id="import-marks" title="將備份標記合併到目前標記">匯入標記</button><input id="mark-file" type="file" accept=".txt,.json,text/plain,application/json" hidden></div>
@@ -720,24 +721,46 @@ function joinArticle(article, fr) {
   if (!article) return fr;
   return article + (/['’]$/.test(article) ? "" : " ") + fr;
 }
-function forms(word) {
-  if (word.gender === "mf") {
-    const pair = word.fr.split(/\s*,\s*/);
-    if (pair.length === 2) {
-      const articles = word.article.split(/\s*\/\s*/);
-      return pair.map((fr, i) => ({
-        text: joinArticle(articles[i] ?? articles[0], fr), gender: i === 0 ? "m" : "f"
-      }));
-    }
+const articleSwitch = byId("definite-articles");
+const articlePreference = "french-flashcards.article-mode.v1";
+try {
+  articleSwitch.checked = localStorage.getItem(articlePreference) === "definite";
+} catch {
+  articleSwitch.checked = false;
+}
+function forms(word, definite = articleSwitch.checked) {
+  const {fr, gender, article} = word;
+  if (!gender) return [{text:fr, gender:""}];
+  const plural = article === "les";
+  if (gender !== "mf") {
+    const prefix = definite ? article : plural ? "des" : gender === "f" ? "une" : "un";
+    return [{text:joinArticle(prefix, fr), gender}];
   }
-  return [{text: joinArticle(word.article, word.fr), gender: word.gender}];
+
+  // 形容詞亦會有陰陽兩式，詞庫用空冠詞識別呢類詞。
+  const names = fr.split(/\s*,\s*/);
+  if (!article) {
+    return names.map((text, i) => ({text, gender:names.length === 1 ? "mf" : i === 0 ? "m" : "f"}));
+  }
+  const optionalEnding = fr.match(/^(.+)\(([^()]+)\)$/);
+  const masculine = optionalEnding ? optionalEnding[1] : names[0];
+  const feminine = optionalEnding ? masculine + optionalEnding[2] : names[1] ?? masculine;
+  const articles = definite ? article.split(/\s*\/\s*/) : plural ? ["des"] : ["un", "une"];
+  const first = articles[0];
+  const second = articles[1] ?? first;
+  const masculineText = joinArticle(first, masculine);
+  if (masculine === feminine && first === second) return [{text:masculineText, gender:"mf"}];
+  return [
+    {text:masculineText, display:masculine === feminine ? first : masculineText, gender:"m"},
+    {text:joinArticle(second, feminine), gender:"f"}
+  ];
 }
 function frenchTerm(parts) {
   const term = element("span", "term");
   term.lang = "fr";
   parts.forEach((part, i) => {
     if (i) term.append(element("span", "separator", " / "));
-    term.append(element("span", part.gender, part.text));
+    term.append(element("span", part.gender, part.display ?? part.text));
   });
   return term;
 }
@@ -934,7 +957,7 @@ function renderDictionary() {
     const list = element("div", "dict-list");
     for (const word of words) {
       if (query) {
-        const fields = [word.fr, word.zh, word.ja, ...forms(word).map(part => part.text)];
+        const fields = [word.fr, word.zh, word.ja, ...forms(word, false).map(part => part.text), ...forms(word, true).map(part => part.text)];
         const matches = fields.some(field => {
           const key = searchKey(field);
           return key.includes(query) || key.replace(/[()]/g, "").includes(query);
@@ -1014,7 +1037,7 @@ for (const [name, words] of groups) {
   boxes.set(name, box);
   const copy = element("span", "group-copy");
   copy.append(element("b", "", name));
-  const preview = element("span", "preview", words.slice(0,2).map(w => forms(w)[0].text).join(" · "));
+  const preview = element("span", "preview");
   preview.lang = "fr";
   copy.append(preview);
   const counts = element("span", "count group-counts", words.length + " 張");
@@ -1024,6 +1047,24 @@ for (const [name, words] of groups) {
   label.append(box, copy, counts);
   byId("groups").append(label);
 }
+function refreshArticleMode() {
+  byId("article-mode").textContent = articleSwitch.checked ? "目前使用 le / la / l’ / les" : "目前使用 un / une / des";
+  for (const [name, box] of boxes) {
+    const preview = box.closest(".group").querySelector(".preview");
+    preview.textContent = groups.get(name).slice(0, 2).map(word =>
+      forms(word).map(part => part.display ?? part.text).join(" / ")
+    ).join(" · ");
+  }
+}
+refreshArticleMode();
+articleSwitch.onchange = () => {
+  refreshArticleMode();
+  try {
+    localStorage.setItem(articlePreference, articleSwitch.checked ? "definite" : "indefinite");
+  } catch {
+    byId("article-mode").textContent += "（瀏覽器暫時未能儲存選擇）";
+  }
+};
 function selectAll(checked) {
   boxes.forEach(box => box.checked = checked);
   syncSelection();
