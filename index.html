@@ -578,6 +578,15 @@ button,input{font:inherit}button{cursor:pointer;border:1px solid var(--line);bor
 .pron-links{display:flex;gap:5px;flex-wrap:wrap}
 .pron-links a{position:relative;z-index:2;display:inline-flex;align-items:center;min-height:28px;padding:2px 7px;border:1px solid var(--line);border-radius:6px;background:var(--paper);color:var(--accent);font-size:13px;text-decoration:none}
 .pron-links a:hover{border-color:var(--accent);text-decoration:underline}
+.home-actions{flex-wrap:wrap}
+.dictation-card,#dictation-done{margin:16px 0;padding:clamp(16px,4vw,32px);background:var(--paper);border:1px solid var(--line);border-radius:12px}
+.dictation-card{display:grid;gap:18px}
+#dictation-en{margin-top:5px;color:var(--muted);font-size:18px}
+#dictation-input{display:block;margin:7px 0;width:100%;padding:10px;border:1px solid #aeb4c0;border-radius:8px;font-size:20px;color:var(--ink)}
+#dictation-letters,.dictation-actions{display:flex;gap:6px;flex-wrap:wrap}
+#dictation-letters button{min-height:36px;min-width:32px;padding:3px 7px;font-size:17px}
+#dictation-feedback:empty{display:none}
+#dictation-feedback{font-weight:600}
 .dict-controls{flex-wrap:wrap;justify-content:space-between;margin:15px 0 8px}
 .search{flex:1 1 240px;min-width:0;font:inherit;font-size:16px;padding:12px 14px;border:1px solid #aeb4c0;border-radius:8px;background:var(--paper);color:var(--ink)}
 .dict-controls .mode{gap:9px}.dict-count{color:var(--muted);font-size:14px}
@@ -625,10 +634,11 @@ button,input{font:inherit}button{cursor:pointer;border:1px solid var(--line);bor
 <div id="groups" class="groups"></div>
 <div class="settings"><label class="mode"><input id="reverse" class="switch" type="checkbox" role="switch"><span><strong>反向模式</strong><span class="hint">先睇中文或日文，翻卡睇法文</span></span></label>
 <label class="mode"><input id="definite-articles" class="switch" type="checkbox" role="switch" aria-label="使用定冠詞 le/la"><span><strong>冠詞：un/une ↔ le/la</strong><span class="hint" id="article-mode"></span></span></label>
+<label class="mode"><input id="dictation-articles" class="switch" type="checkbox" role="switch"><span><strong>默書連冠詞</strong><span class="hint">名詞跟上面揀嘅冠詞默寫</span></span></label>
 <label class="mode"><input id="only-unfamiliar" class="switch" type="checkbox" role="switch"><span><strong>只溫唔熟的字</strong><span class="hint">由已揀分類中，練習標咗星嘅單詞</span></span></label>
 <div class="voice-setting"><label for="voice-select">語音</label><select id="voice-select" aria-describedby="voice-name"></select></div>
 <p class="hint" id="voice-name" role="status"></p></div>
-<div class="toolbar"><span id="selection" aria-live="polite" class="selection"></span><div class="home-actions"><button type="button" onclick="location.href='pronunciation.html'">發音</button><button id="open-dict">字典</button><button id="start" class="primary">開始練習 →</button></div></div>
+<div class="toolbar"><span id="selection" aria-live="polite" class="selection"></span><div class="home-actions"><button type="button" onclick="location.href='pronunciation.html'">發音</button><button id="open-dict">字典</button><button id="start-dictation">開始默書</button><button id="start" class="primary">開始練習 →</button></div></div>
 <div class="backup-actions"><button id="export-marks">匯出標記</button><button id="import-marks" title="將備份標記合併到目前標記">匯入標記</button><input id="mark-file" type="file" accept=".txt,.json,text/plain,application/json" hidden></div>
 <p id="mark-status" role="status"></p>
 </section>
@@ -639,6 +649,22 @@ button,input{font:inherit}button{cursor:pointer;border:1px solid var(--line);bor
 <label class="mode"><input type="checkbox" role="switch" id="hide-trans" class="switch"><span><strong>隱藏翻譯</strong><span class="hint">點空白格睇答案</span></span></label></div>
 <p id="dict-count" class="dict-count" role="status"></p><div id="dict-groups"></div>
 <p id="dict-audio" class="audio-status" role="status"></p>
+</section>
+<section id="dictation" aria-labelledby="dictation-title" hidden>
+<div class="study-head"><button id="dictation-back" class="subtle">← 返回主畫面</button><span id="dictation-progress" class="count"></span></div>
+<h2 class="section-title" id="dictation-title">默書</h2>
+<form id="dictation-form" class="dictation-card" autocomplete="off">
+  <p id="dictation-group" class="card-tag"></p>
+  <div><p id="dictation-zh" class="meaning"></p><p id="dictation-en" lang="en"></p></div>
+  <div>
+    <label for="dictation-input" id="dictation-prompt"></label>
+    <input id="dictation-input" type="text" lang="fr" spellcheck="false" autocorrect="off" autocapitalize="none" autocomplete="off" enterkeyhint="go">
+    <div id="dictation-letters" role="group" aria-label="法文特殊字母"></div>
+  </div>
+  <p id="dictation-feedback" role="status" aria-live="polite"></p>
+  <div class="dictation-actions"><button class="primary" id="dictation-submit" type="submit">對答案</button><button id="dictation-reveal" type="button">睇答案</button><button id="dictation-skip" type="button" class="subtle">跳過</button></div>
+</form>
+<p id="dictation-done" tabindex="-1" hidden>今輪默書已完成。</p>
 </section>
 <section id="study" aria-label="單詞卡練習" hidden>
 <div class="study-head"><button id="back" class="subtle">← 返回主畫面</button><strong id="progress" aria-live="polite"></strong></div>
@@ -695,6 +721,593 @@ const SECTIONS = new Map([
   ["性質・狀態", "形容詞・副詞"],
   ["時間・場所", "形容詞・副詞"]
 ]);
+// 默書英文提示按細分類同詞條配對，同一個字嘅唔同意思可以各自出題。
+const DICTATION_ENGLISH = {
+  "家族・朋友・人物": {
+    "famille": "family",
+    "parents": "mother and father",
+    "père": "father",
+    "papa": "dad",
+    "mère": "mother",
+    "maman": "mum",
+    "enfant": "child",
+    "fils": "son",
+    "fille": "girl, daughter",
+    "frère": "brother",
+    "sœur": "sister",
+    "cousin, cousine": "child of an aunt or uncle",
+    "grand-père": "grandfather",
+    "grand-mère": "grandmother",
+    "grands-parents": "grandparents",
+    "petit-fils": "grandson",
+    "petite-fille": "granddaughter",
+    "oncle": "uncle",
+    "tante": "aunt",
+    "ami(e)": "friend",
+    "garçon": "boy",
+    "homme": "man, human being",
+    "femme": "woman, wife",
+    "mari": "husband",
+    "madame": "madam, Mrs",
+    "mademoiselle": "miss (form of address)",
+    "monsieur": "sir, Mr",
+    "gens": "people",
+    "copain, copine": "pal, boyfriend or girlfriend"
+  },
+  "人生": {
+    "vie": "life",
+    "mort": "death",
+    "naissance": "birth",
+    "anniversaire": "anniversary, birthday",
+    "mariage": "marriage",
+    "rêve": "dream",
+    "amour": "love"
+  },
+  "心情": {
+    "bonheur": "happiness",
+    "malheur": "misfortune, bad luck",
+    "chance": "luck",
+    "courage": "bravery",
+    "colère": "anger",
+    "peur": "fear",
+    "faim": "hunger",
+    "soif": "thirst",
+    "sommeil": "sleepiness",
+    "besoin": "need",
+    "sens": "sense, judgement, meaning",
+    "envie": "desire, urge"
+  },
+  "住所・日用品": {
+    "maison": "house, home",
+    "salle": "room, hall",
+    "chambre": "bedroom",
+    "cuisine": "kitchen, cooking",
+    "bain": "bath",
+    "toilettes": "toilet, restroom",
+    "escalier": "staircase",
+    "étage": "floor of a building",
+    "jardin": "garden",
+    "fenêtre": "window",
+    "lit": "bed",
+    "porte": "door",
+    "clef": "key",
+    "table": "piece of furniture for eating or working at",
+    "chaise": "chair",
+    "téléphone": "telephone",
+    "télévision": "television",
+    "radio": "wireless receiver, broadcasting service",
+    "ordinateur": "computer",
+    "stylo": "pen",
+    "crayon": "pencil",
+    "papier": "paper",
+    "gomme": "eraser",
+    "cahier": "notebook"
+  },
+  "隨身物品": {
+    "chose": "thing",
+    "vêtement": "item of clothing",
+    "robe": "dress",
+    "chemise": "shirt",
+    "veste": "jacket",
+    "chapeau": "hat",
+    "lunettes": "glasses",
+    "montre": "wristwatch",
+    "cravate": "tie",
+    "chaussure": "shoe",
+    "pantalon": "trousers",
+    "jupe": "skirt",
+    "poche": "pocket",
+    "sac": "bag",
+    "valise": "suitcase",
+    "parfum": "perfume"
+  },
+  "飲食": {
+    "petit déjeuner": "breakfast",
+    "déjeuner": "lunch",
+    "dîner": "dinner",
+    "boisson": "drink, beverage",
+    "bouteille": "bottle",
+    "verre": "drinking glass",
+    "vin": "wine",
+    "bière": "beer",
+    "café": "coffee",
+    "thé": "tea",
+    "lait": "milk",
+    "huile": "oil",
+    "beurre": "butter",
+    "œuf": "egg",
+    "viande": "meat",
+    "porc": "pork, pig",
+    "poulet": "chicken",
+    "bœuf": "beef, ox",
+    "poisson": "fish",
+    "légume": "vegetable",
+    "tomate": "tomato",
+    "citron": "lemon",
+    "salade": "salad",
+    "pain": "bread",
+    "soupe": "soup",
+    "plat": "dish, main course",
+    "sel": "salt",
+    "fruit": "food such as an apple or pear",
+    "pomme": "apple",
+    "poire": "pear",
+    "orange": "round citrus fruit with a thick peel",
+    "banane": "banana",
+    "fraise": "strawberry",
+    "raisin": "grape",
+    "riz": "rice",
+    "blé": "wheat",
+    "glace": "ice cream",
+    "fromage": "cheese",
+    "boire": "to drink",
+    "manger": "to eat",
+    "fumer": "to smoke"
+  },
+  "方向": {
+    "est": "east",
+    "ouest": "west",
+    "sud": "south",
+    "nord": "north",
+    "droite": "right-hand side",
+    "gauche": "left-hand side"
+  },
+  "旅行": {
+    "voyage": "trip, journey",
+    "voyageur, voyageuse": "traveller",
+    "touriste": "tourist",
+    "séjour": "stay, visit",
+    "monde": "world, people",
+    "pays": "country",
+    "culture": "a society’s arts and customs",
+    "vue": "view, sight",
+    "plan": "map, project outline",
+    "passeport": "passport",
+    "absence": "being away",
+    "rencontre": "encounter, meeting"
+  },
+  "交通": {
+    "gare": "railway station",
+    "train": "railway vehicle",
+    "station": "metro stop",
+    "métro": "metro, subway",
+    "vélo": "bicycle",
+    "voiture": "car",
+    "taxi": "cab",
+    "bus": "large road vehicle for public transport",
+    "arrêt": "stop (for buses, etc.)",
+    "bateau": "boat",
+    "avion": "aeroplane",
+    "moto": "motorcycle",
+    "grève": "strike (by workers)",
+    "ticket": "pass for travel or admission"
+  },
+  "街道・設施": {
+    "ville": "city, town",
+    "village": "small rural community",
+    "marché": "market",
+    "restaurant": "place to eat out",
+    "boutique": "small shop",
+    "magasin": "store, shop",
+    "boulangerie": "bakery",
+    "pâtisserie": "pastry shop",
+    "boucherie": "butcher’s shop",
+    "librairie": "bookshop",
+    "musée": "museum",
+    "bibliothèque": "library",
+    "cinéma": "cinema",
+    "église": "church",
+    "château": "castle",
+    "hôpital": "hospital",
+    "hôtel": "hotel",
+    "poste": "post office",
+    "banque": "bank",
+    "place": "square, seat",
+    "parc": "park",
+    "tour": "tower",
+    "bâtiment": "building",
+    "adresse": "address",
+    "rue": "street"
+  },
+  "購物・金錢": {
+    "argent": "money",
+    "billet": "banknote, ticket",
+    "monnaie": "small change, currency",
+    "prix": "price",
+    "cadeau": "gift"
+  },
+  "位置・形狀": {
+    "centre": "central point",
+    "milieu": "middle, surroundings",
+    "coin": "corner",
+    "bord": "edge, shore",
+    "bout": "end, tip",
+    "fond": "bottom, depths",
+    "côté": "side",
+    "point": "dot",
+    "ligne": "line, row",
+    "forme": "shape, form",
+    "partie": "part, portion"
+  },
+  "學校・教育": {
+    "classe": "class (group of pupils)",
+    "cours": "class, course of instruction",
+    "leçon": "lesson",
+    "exercice": "exercise",
+    "exemple": "example",
+    "examen": "exam",
+    "question": "something you ask",
+    "réponse": "answer, reply",
+    "faute": "fault, mistake",
+    "erreur": "error, misjudgement",
+    "note": "written reminder, grade",
+    "école": "school",
+    "collège": "middle school",
+    "lycée": "high school"
+  },
+  "興趣・運動": {
+    "jeu": "game",
+    "dessin": "drawing",
+    "peinture": "painting",
+    "photo": "photograph",
+    "musique": "music",
+    "piano": "keyboard instrument with hammers and strings",
+    "guitare": "guitar",
+    "violon": "violin",
+    "chanson": "song",
+    "film": "movie",
+    "fête": "festival, party",
+    "théâtre": "theatre",
+    "rôle": "role",
+    "sport": "athletic activity",
+    "match": "competitive game",
+    "équipe": "team",
+    "ski": "skiing",
+    "natation": "swimming",
+    "tennis": "racket game with a net and a small felt ball",
+    "football": "soccer",
+    "balle": "small ball",
+    "ballon": "large inflatable ball",
+    "vacances": "holidays",
+    "rendez-vous": "appointment, date",
+    "visite": "visit",
+    "travail": "work (noun)",
+    "habitude": "habit"
+  },
+  "時間": {
+    "date": "day on the calendar",
+    "matin": "morning (time of day)",
+    "matinée": "the course of the morning",
+    "jour": "day (unit of time)",
+    "journée": "whole day, daytime",
+    "midi": "noon",
+    "après-midi": "afternoon",
+    "soir": "evening (time of day)",
+    "soirée": "evening, evening party",
+    "nuit": "night",
+    "minuit": "midnight",
+    "temps": "time, weather"
+  },
+  "數量": {
+    "demi": "half (fraction), small draught beer",
+    "quart": "one quarter",
+    "moitié": "half, one of two equal parts",
+    "numéro": "number (identifier)",
+    "chiffre": "digit",
+    "fois": "time, occurrence"
+  },
+  "動物": {
+    "animal": "living creature, such as a cat or bird",
+    "chat, chatte": "cat",
+    "cheval": "horse",
+    "chien, chienne": "dog",
+    "oiseau": "bird",
+    "vache": "cow"
+  },
+  "自然・地形": {
+    "nature": "the natural world",
+    "fleur": "flower",
+    "arbre": "tree",
+    "feuille": "leaf",
+    "bois": "woods, timber",
+    "forêt": "forest",
+    "montagne": "mountain",
+    "terre": "ground, land",
+    "mer": "sea",
+    "île": "island",
+    "lac": "lake",
+    "fleuve": "large river flowing into the sea"
+  },
+  "自然・天氣": {
+    "ciel": "sky",
+    "pluie": "rain",
+    "neige": "snow",
+    "nuage": "cloud",
+    "vent": "wind",
+    "soleil": "sun",
+    "étoile": "star",
+    "lune": "moon",
+    "lumière": "light",
+    "ombre": "shadow, shade",
+    "eau": "water",
+    "feu": "fire"
+  },
+  "身體": {
+    "corps": "body",
+    "tête": "head",
+    "main": "hand",
+    "pied": "foot",
+    "bras": "arm",
+    "jambe": "leg",
+    "cœur": "heart",
+    "visage": "face",
+    "œil": "eye",
+    "nez": "nose",
+    "bouche": "mouth",
+    "oreille": "ear"
+  },
+  "基本動詞": {
+    "avoir": "to have",
+    "être": "to be",
+    "faire": "to do, to make",
+    "aller": "to go",
+    "venir": "to come",
+    "devoir": "to have to, should",
+    "pouvoir": "to be able to, can",
+    "vouloir": "to want",
+    "falloir": "to be necessary (impersonal verb)",
+    "laisser": "to let, to leave behind",
+    "mettre": "to put, to put on",
+    "prendre": "to take, to catch (transport)"
+  },
+  "感情・知覺": {
+    "aimer": "to like, to love",
+    "adorer": "to adore",
+    "préférer": "to prefer",
+    "plaire": "to please, to appeal to",
+    "rire": "to laugh",
+    "pleurer": "to cry",
+    "regarder": "to look at, to watch",
+    "voir": "to see, to understand",
+    "écouter": "to listen to",
+    "entendre": "to hear",
+    "sentir": "to feel, to smell",
+    "toucher": "to touch"
+  },
+  "移動・動作": {
+    "arriver": "to arrive",
+    "entrer": "to enter",
+    "rentrer": "to go back home",
+    "sortir": "to go out",
+    "partir": "to depart, to set off",
+    "passer": "to pass, to spend time",
+    "naître": "to be born",
+    "mourir": "to die",
+    "tomber": "to fall",
+    "monter": "to go up, to get on",
+    "descendre": "to go down, to get off",
+    "retourner": "to return, to go back",
+    "rester": "to stay, to remain",
+    "devenir": "to become",
+    "visiter": "to visit a place",
+    "suivre": "to follow",
+    "quitter": "to leave a person or place",
+    "tourner": "to turn",
+    "courir": "to run",
+    "marcher": "to walk",
+    "voyager": "to travel",
+    "conduire": "to drive",
+    "gagner": "to win, to earn",
+    "perdre": "to lose"
+  },
+  "思考・判斷": {
+    "savoir": "to know a fact, to know how",
+    "connaître": "to know, to be familiar with",
+    "croire": "to believe",
+    "penser": "to think",
+    "trouver": "to find, to consider",
+    "sembler": "to seem",
+    "douter": "to doubt",
+    "hésiter": "to hesitate",
+    "décider": "to decide",
+    "excuser": "to excuse, to forgive"
+  },
+  "日常動作": {
+    "ouvrir": "to open",
+    "fermer": "to close",
+    "se reposer": "to rest",
+    "s'asseoir": "to sit down",
+    "se coucher": "to go to bed",
+    "dormir": "to sleep",
+    "se réveiller": "to wake up",
+    "se lever": "to get up",
+    "habiter": "to live in, to reside",
+    "vivre": "to live, to be alive",
+    "danser": "to dance",
+    "chanter": "to sing",
+    "jouer": "to play (a game or instrument)",
+    "amuser": "to amuse someone"
+  },
+  "溝通": {
+    "lire": "to read",
+    "écrire": "to write",
+    "parler": "to speak",
+    "dire": "to say, to tell",
+    "appeler": "to call, to telephone",
+    "téléphoner": "to phone",
+    "expliquer": "to explain",
+    "se taire": "to keep quiet"
+  },
+  "生活・動作": {
+    "se laver": "to wash oneself",
+    "nettoyer": "to clean",
+    "ranger": "to tidy up",
+    "changer": "to change, to replace",
+    "élever": "to raise children or animals",
+    "soigner": "to look after, to treat",
+    "garder": "to keep, to look after",
+    "couper": "to cut",
+    "servir": "to serve food or drinks",
+    "aider": "to help"
+  },
+  "動作・狀態": {
+    "commencer": "to begin",
+    "durer": "to last",
+    "continuer": "to continue",
+    "finir": "to finish",
+    "cesser": "to cease",
+    "arrêter": "to stop, to bring to a halt"
+  },
+  "人的動作": {
+    "acheter": "to buy",
+    "vendre": "to sell",
+    "donner": "to give",
+    "chercher": "to look for",
+    "choisir": "to choose",
+    "coûter": "to cost",
+    "demander": "to ask, to request",
+    "frapper": "to knock, to strike",
+    "pousser": "to push",
+    "jeter": "to throw, to throw away",
+    "poser": "to put down, to set down",
+    "porter": "to carry, to wear",
+    "saisir": "to grab, to seize",
+    "tenir": "to hold",
+    "tuer": "to kill"
+  },
+  "學習": {
+    "travailler": "to work",
+    "étudier": "to study",
+    "apprendre": "to learn, to teach someone something",
+    "comprendre": "to understand",
+    "enseigner": "to teach",
+    "oublier": "to forget"
+  },
+  "事物的特徵": {
+    "nouveau, nouvelle": "new",
+    "vieux, vieille": "old, elderly",
+    "ancien, ancienne": "former, old",
+    "chaud, chaude": "hot",
+    "froid, froide": "cold",
+    "frais, fraîche": "cool, fresh",
+    "grand, grande": "big, tall",
+    "petit, petite": "small, little",
+    "large": "wide",
+    "étroit, étroite": "narrow",
+    "haut, haute": "high",
+    "bas, basse": "low"
+  },
+  "人的感情・性格": {
+    "heureux, heureuse": "happy",
+    "malheureux, malheureuse": "unhappy, unfortunate",
+    "triste": "sad",
+    "cher, chère": "dear, beloved",
+    "charmant, charmante": "charming",
+    "aimable": "friendly, courteous",
+    "sympathique": "likeable",
+    "joyeux, joyeuse": "joyful, cheerful",
+    "gentil, gentille": "kind, nice",
+    "honnête": "honest",
+    "méchant, méchante": "mean, nasty",
+    "timide": "shy",
+    "bizarre": "strange",
+    "fou, folle": "crazy",
+    "bête": "silly, foolish",
+    "beau, belle": "beautiful",
+    "prêt, prête": "ready",
+    "surpris, surprise": "surprised",
+    "célèbre": "famous",
+    "riche": "rich",
+    "pauvre": "poor",
+    "gros, grosse": "big, bulky or fat",
+    "mince": "slim, thin",
+    "maigre": "skinny, too thin"
+  },
+  "性質・狀態": {
+    "fort, forte": "strong",
+    "faible": "weak",
+    "âgé, âgée": "elderly",
+    "jeune": "young",
+    "joli, jolie": "pretty",
+    "blessé, blessée": "injured",
+    "malade": "ill, sick",
+    "agréable": "pleasant",
+    "doux, douce": "gentle, soft",
+    "parfait, parfaite": "perfect",
+    "possible": "able to happen",
+    "impossible": "unable to happen",
+    "facile": "easy",
+    "difficile": "difficult",
+    "dur, dure": "hard, tough",
+    "bon, bonne": "good",
+    "meilleur, meilleure": "better (adjective)",
+    "bien": "well, very",
+    "mieux": "better (adverb)",
+    "mauvais, mauvaise": "bad",
+    "mal": "badly",
+    "terrible": "dreadful",
+    "sûr, sûre": "sure, confident",
+    "intéressant, intéressante": "interesting",
+    "grave": "serious",
+    "faux, fausse": "false, wrong",
+    "correct, correcte": "accurate, right",
+    "vrai, vraie": "true, real",
+    "vraiment": "really, truly",
+    "certain, certaine": "definite, sure",
+    "certainement": "certainly",
+    "rare": "uncommon",
+    "cher, chère": "expensive",
+    "amusant, amusante": "fun, amusing",
+    "égal, égale": "equal",
+    "libre": "free"
+  },
+  "時間・場所": {
+    "plutôt": "rather, preferably",
+    "juste": "just, exactly",
+    "aujourd’hui": "today",
+    "demain": "tomorrow",
+    "hier": "yesterday",
+    "bientôt": "soon",
+    "longtemps": "for a long time",
+    "maintenant": "now",
+    "prochain, prochaine": "next (adjective)",
+    "dernier, dernière": "last, previous",
+    "tôt": "early",
+    "tard": "late",
+    "ici": "here",
+    "là": "there",
+    "là-bas": "over there",
+    "proche": "near, close (adjective)",
+    "près": "nearby (adverb)",
+    "loin": "far away",
+    "dedans": "inside",
+    "dehors": "outside",
+    "ensuite": "next, afterwards",
+    "puis": "then (in a sequence)",
+    "enfin": "finally, at last",
+    "ainsi": "thus, in this way"
+  }
+};
 const sectionGroups = new Map();
 for (const [group, section] of SECTIONS) {
   if (!sectionGroups.has(section)) sectionGroups.set(section, []);
@@ -1149,11 +1762,14 @@ function showCard() {
   byId("prev").disabled = index === 0;
   byId("next").disabled = index === deck.length - 1;
 }
-function shuffle() {
-  for (let i = deck.length - 1; i > 0; i--) {
+function shuffleWords(words) {
+  for (let i = words.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
-    [deck[i], deck[j]] = [deck[j], deck[i]];
+    [words[i], words[j]] = [words[j], words[i]];
   }
+}
+function shuffle() {
+  shuffleWords(deck);
   index = 0;
   flipped = false;
   showCard();
@@ -1191,6 +1807,7 @@ function syncSelection() {
   const count = onlyMarked ? unfamiliar : selected;
   byId("selection").textContent = onlyMarked ? "已揀分類有 " + count + " 張唔熟卡" : "已揀 " + count + " 張";
   byId("start").disabled = !count;
+  byId("start-dictation").disabled = !count;
   byId("open-dict").disabled = !selected;
 }
 const homeStorage = "french-flashcards.categories.v1";
@@ -1289,9 +1906,130 @@ byId("all").onclick = () => selectAll(true);
 byId("none").onclick = () => selectAll(false);
 byId("total").textContent = sectionGroups.size + " 個大分類 · " + groups.size + " 個細分類 · 共 " + WORDS.length + " 張";
 syncSelection();
-byId("start").onclick = () => {
+function selectedWords() {
   const onlyMarked = byId("only-unfamiliar").checked;
-  deck = WORDS.filter(word => boxes.get(word.group).checked && (!onlyMarked || marks.has(markKey(word))));
+  return WORDS.filter(word => boxes.get(word.group).checked && (!onlyMarked || marks.has(markKey(word))));
+}
+let dictationWords = [];
+let dictationIndex = 0;
+let expectedAnswer = "";
+let answerClosed = false;
+const dictationInput = byId("dictation-input");
+const dictationFeedback = byId("dictation-feedback");
+
+function normalizeAnswer(text) {
+  return text.normalize("NFC").toLocaleLowerCase("fr").trim()
+    .replace(/[’‘ʼ]/g, "'").replace(/[‐‑]/g, "-").replace(/\s+/g, " ");
+}
+function withoutAccents(text) {
+  return text.normalize("NFD").replace(/\p{M}/gu, "");
+}
+
+function showDictationWord() {
+  const word = dictationWords[dictationIndex];
+  const withArticle = Boolean(word.article && byId("dictation-articles").checked);
+  const parts = forms(word);
+  const answers = parts.map(part => withArticle || !word.article ? part.text :
+    part.text.replace(/^(?:(?:un|une|des|le|la|les) |l['’])/, ""));
+  const varies = new Set(answers).size > 1;
+  const choice = varies ? Math.floor(Math.random() * answers.length) : 0;
+  const hints = [];
+  if (varies) hints.push(parts[choice].gender === "f" ? "陰性" : "陽性");
+  if (word.article === "les") hints.push("複數");
+  if (withArticle) hints.push(articleSwitch.checked ? "連定冠詞" : "連不定冠詞");
+  expectedAnswer = answers[choice];
+  answerClosed = false;
+  byId("dictation-group").textContent = word.group;
+  byId("dictation-zh").textContent = word.zh;
+  byId("dictation-en").textContent = DICTATION_ENGLISH[word.group]?.[word.fr] || "（未有英文提示）";
+  byId("dictation-progress").textContent = (dictationIndex + 1) + " / " + dictationWords.length;
+  byId("dictation-prompt").textContent = hints.length ? "輸入法文（" + hints.join("、") + "）" : "輸入法文";
+  dictationFeedback.textContent = "";
+  dictationInput.value = "";
+  dictationInput.readOnly = false;
+  byId("dictation-letters").hidden = false;
+  byId("dictation-submit").textContent = "對答案";
+  byId("dictation-reveal").hidden = false;
+  byId("dictation-skip").hidden = false;
+  dictationInput.focus();
+}
+
+function closeDictationAnswer(message) {
+  answerClosed = true;
+  dictationInput.readOnly = true;
+  dictationFeedback.textContent = message;
+  byId("dictation-letters").hidden = true;
+  byId("dictation-reveal").hidden = true;
+  byId("dictation-skip").hidden = true;
+  byId("dictation-submit").textContent = dictationIndex + 1 === dictationWords.length ? "完成" : "下一題";
+  byId("dictation-submit").focus();
+}
+
+function advanceDictation() {
+  dictationIndex++;
+  if (dictationIndex < dictationWords.length) {
+    showDictationWord();
+    return;
+  }
+  byId("dictation-form").hidden = true;
+  byId("dictation-done").hidden = false;
+  byId("dictation-done").focus();
+}
+
+for (const letter of "àâæçéèêëîïôœùûüÿ") {
+  const button = element("button", "", letter);
+  button.type = "button";
+  button.lang = "fr";
+  button.addEventListener("mousedown", event => event.preventDefault());
+  button.onclick = () => {
+    dictationInput.setRangeText(letter, dictationInput.selectionStart, dictationInput.selectionEnd, "end");
+    dictationInput.focus();
+  };
+  byId("dictation-letters").append(button);
+}
+
+byId("dictation-form").addEventListener("keydown", event => {
+  if (event.key === "Enter" && (event.repeat || event.isComposing)) event.preventDefault();
+});
+byId("dictation-form").onsubmit = event => {
+  event.preventDefault();
+  if (answerClosed) {
+    advanceDictation();
+    return;
+  }
+  const entered = normalizeAnswer(dictationInput.value);
+  const expected = normalizeAnswer(expectedAnswer);
+  if (entered === expected) {
+    closeDictationAnswer("答啱！");
+    return;
+  }
+  if (!entered) dictationFeedback.textContent = "請先輸入答案。";
+  else if (withoutAccents(entered) === withoutAccents(expected)) dictationFeedback.textContent = "留意變音符號，再試吓。";
+  else dictationFeedback.textContent = "再試吓。";
+  dictationInput.focus();
+};
+byId("dictation-reveal").onclick = () => closeDictationAnswer("正確答案：" + expectedAnswer);
+byId("dictation-skip").onclick = advanceDictation;
+byId("start-dictation").onclick = () => {
+  dictationWords = selectedWords();
+  if (!dictationWords.length) return;
+  shuffleWords(dictationWords);
+  dictationIndex = 0;
+  byId("home").hidden = true;
+  byId("dictation").hidden = false;
+  byId("dictation-form").hidden = false;
+  byId("dictation-done").hidden = true;
+  window.scrollTo(0,0);
+  showDictationWord();
+};
+byId("dictation-back").onclick = () => {
+  byId("dictation").hidden = true;
+  byId("home").hidden = false;
+  byId("start-dictation").focus({preventScroll:true});
+  window.scrollTo(0,0);
+};
+byId("start").onclick = () => {
+  deck = selectedWords();
   if (!deck.length) return;
   byId("home").hidden = true;
   byId("study").hidden = false;
